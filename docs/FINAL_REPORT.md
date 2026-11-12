@@ -94,12 +94,24 @@ Browser, against the running dev servers (`http://localhost:5173`, API on port 3
 | DOC-2 | Done | `docs/DEPLOY.md`, `docs/BACKUP.md`, `docs/PRIVACY.md`, `docs/PERMISSIONS.md`, `docs/DECISIONS.md`. |
 | DOC-3 | Done | `LICENSE` is a proprietary placeholder. It is not an open-source grant. |
 
+## Follow-up the same day
+
+Messaging and a manual pass are in `docs/QA_MANUAL.md` and `docs/MESSAGING.md`.
+
+- Telegram settings now include the bot username and the reminder window in hours. The token is still write-only. A test with a fake token returned 502 and was not marked sent.
+- WhatsApp settings save the Cloud API phone number ID, business account ID, test recipient, and a write-only access token. Patient WhatsApp reminders are not sent and the screen says coming soon. A test is marked delivered only when Meta returns a message id. A fake token returned 502.
+- A separate API on port 3011 passed 22 clinic checks: owner, doctor, service, patient, appointment, confirm, tooth chart, visit, payment, balance 300, public booking, and a rejected double book.
+- The browser, signed in on the existing clinic, opened Home, Settings, Patients, the tooth chart, Calendar, and public booking in English and Arabic.
+- A dashboard JSX error (two paragraphs inside one branch) was fixed before that browser pass.
+- Clinic-facing instructions are in `docs/TUTORIAL.md`, `docs/INSTALL.md`, `docs/ADMIN_GUIDE.md`, and `docs/PHASES.md`.
+
 ## Remaining gaps
 
 - Treatment plans, attachments, medical alerts, and a richer clinical report are not built.
-- Staff screens are not fully translated.
+- Patient WhatsApp reminders are not sent. Only a manual test to the owner's number can call Meta.
+- Some calendar form labels inside the appointment dialog can still be English when the rest of the screen is Arabic.
 - Playwright is not part of the project.
-- Telegram delivery to a real bot was not exercised.
+- Telegram and WhatsApp were not delivered to a real chat. Fake tokens were rejected.
 - Docker and a nightly backup schedule are documented and were not executed on this machine.
 - `npm audit` still reports toolchain vulnerabilities. They were not force-fixed.
 - The public reschedule control is a time field. Invalid times are rejected by the API. It does not list open times for the new date.

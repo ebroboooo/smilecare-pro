@@ -48,3 +48,10 @@
 - Production mode serves the built website from the API. `Dockerfile`, `docker-compose.yml`, and `Caddyfile` are samples. They were not launched in this session. `start.bat` and `start.sh` install, build, and start. `scripts/setup-clinic.ps1` writes `server/.env` only when that file is missing, including a generated `SESSION_SECRET`.
 - GitHub Actions runs install, typecheck, lint, test, and build. Playwright is not installed, so there is no browser job.
 - The API reads `server/.env` or `.env` for variables that are not already set. A variable already in the process environment wins.
+
+## 2026-11-12 — Messaging follow-up
+
+- Telegram settings now also store the bot username and how many hours before a visit to send the one reminder (1–72, default 24). The patient link uses `https://t.me/<username>?start=...` when a username is saved.
+- WhatsApp Cloud API credentials (phone number ID, business account ID, test recipient, access token) are stored on the server. The token is not returned to the browser.
+- A WhatsApp or Telegram test is `delivered: true` only after the provider accepts it. The automated test runner does not call Meta or Telegram and returns 501 for the WhatsApp test route. A fake token against the live adapter returns 502 and is not recorded as sent.
+- Patient WhatsApp reminders are not sent. The settings screen says coming soon. Only the explicit test button calls Meta, and only to the number the owner typed.
