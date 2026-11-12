@@ -6,6 +6,7 @@ import { CLINIC_ID } from '../../types';
 import { DEMO_MODE } from '../../db';
 import { mockDbInstance } from '../../db/mockRepository';
 import { BusinessNotFound } from './BusinessNotFound';
+import { PublicBooking } from './PublicBooking';
 import {
   getAvailableSlots, validateBookingForm, isPastDate, type BookingFormErrors
 } from '../../utils/bookingValidation';
@@ -16,6 +17,12 @@ import {
 } from 'lucide-react';
 
 export const BookingPortal: React.FC = () => {
+  const { slug } = useParams<{ slug: string }>();
+  if (!DEMO_MODE) return <PublicBooking slug={slug || ''} />;
+  return <DemoBookingPortal />;
+};
+
+const DemoBookingPortal: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const { branches, services, employees, reservations, settings, refreshData, isLoading } = useApp();
 

@@ -30,7 +30,14 @@ export const Settings: React.FC = () => {
     phone: settings?.phone || '',
     email: settings?.email || '',
     currency: settings?.currency || 'USD',
-    language: settings?.language || 'en'
+    language: settings?.language || 'en',
+    timezone: settings?.timezone || 'Africa/Cairo',
+  });
+  const [rules, setRules] = useState(settings?.bookingRules || {
+    minNoticeMinutes: 60,
+    maxDaysAhead: 90,
+    cancelWindowHours: 24,
+    slotIntervalMinutes: 30,
   });
 
   const [activeSubTab, setActiveSubTab] = useState<'profile' | 'preset' | 'modules' | 'audit'>('profile');
@@ -43,8 +50,10 @@ export const Settings: React.FC = () => {
         phone: settings.phone,
         email: settings.email,
         currency: settings.currency,
-        language: settings.language
+        language: settings.language,
+        timezone: settings.timezone || 'Africa/Cairo',
       });
+      setRules(settings.bookingRules);
     }
   }, [settings]);
 
@@ -65,7 +74,8 @@ export const Settings: React.FC = () => {
     const org = CLINIC_ID;
     await db.settings.update(org, {
       ...profileData,
-      isRtl: profileData.language === 'ar'
+      isRtl: profileData.language === 'ar',
+      bookingRules: rules,
     });
 
     await dispatchAuditLog("Settings Changed", `Updated clinic profile information.`);
@@ -74,7 +84,7 @@ export const Settings: React.FC = () => {
   };
 
   // Toggle individual integration features
-  const handleToggleFeature = async (featureKey: 'waitlistEnabled') => {
+  const handleToggleFeature = async (featureKey: 'waitlistEnabled' | 'publicBookingEnabled') => {
     if (!settings) return;
     const org = CLINIC_ID;
     const updatedFeatures = {
@@ -194,6 +204,25 @@ export const Settings: React.FC = () => {
               </div>
             </div>
 
+            <div>
+              <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Timezone</label>
+              <input className="w-full input-field text-xs" value={profileData.timezone} onChange={(e) => setProfileData((prev) => ({ ...prev, timezone: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Notice (minutes)
+                <input type="number" min={0} className="mt-1 w-full input-field text-xs" value={rules.minNoticeMinutes} onChange={(e) => setRules({ ...rules, minNoticeMinutes: Number(e.target.value) })} />
+              </label>
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Days ahead
+                <input type="number" min={1} className="mt-1 w-full input-field text-xs" value={rules.maxDaysAhead} onChange={(e) => setRules({ ...rules, maxDaysAhead: Number(e.target.value) })} />
+              </label>
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Cancel window (hours)
+                <input type="number" min={0} className="mt-1 w-full input-field text-xs" value={rules.cancelWindowHours} onChange={(e) => setRules({ ...rules, cancelWindowHours: Number(e.target.value) })} />
+              </label>
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Slot interval (minutes)
+                <input type="number" min={5} className="mt-1 w-full input-field text-xs" value={rules.slotIntervalMinutes} onChange={(e) => setRules({ ...rules, slotIntervalMinutes: Number(e.target.value) })} />
+              </label>
+            </div>
+
             <div className="pt-4 border-t border-slate-200 flex justify-end">
               <button type="submit" className="btn-primary px-5 py-2.5 text-xs">
                 {t.save}
@@ -269,6 +298,18 @@ export const Settings: React.FC = () => {
                 </div>
                 <button type="button" onClick={() => handleToggleFeature('waitlistEnabled')}>
                   {settings.features.waitlistEnabled
+                    ? <ToggleRight className="h-9 w-9 text-brand-600" />
+                    : <ToggleLeft className="h-9 w-9 text-slate-400" />
+                  }
+                </button>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <p className="text-xs font-bold text-slate-900">Online booking</p>
+                  <p className="text-[10px] text-slate-400">Let patients request a time from the public page</p>
+                </div>
+                <button type="button" onClick={() => handleToggleFeature('publicBookingEnabled')}>
+                  {settings.features.publicBookingEnabled
                     ? <ToggleRight className="h-9 w-9 text-brand-600" />
                     : <ToggleLeft className="h-9 w-9 text-slate-400" />
                   }

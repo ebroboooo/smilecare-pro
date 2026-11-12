@@ -83,8 +83,8 @@ export const LeadsPipeline: React.FC = () => {
           <h4 className="text-2xl font-bold text-slate-900 mt-1">{activeLeads} Leads</h4>
         </div>
         <div className="card p-5 rounded-2xl border-slate-200 bg-gradient-to-b from-slate-900/60 to-slate-950/40">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Lead Acquisition Rate</p>
-          <h4 className="text-2xl font-bold text-green-400 mt-1">+24% month-on-month</h4>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">New inquiries</p>
+          <h4 className="text-2xl font-bold text-slate-900 mt-1">{leads.filter((lead) => lead.status === 'New').length}</h4>
         </div>
       </div>
 

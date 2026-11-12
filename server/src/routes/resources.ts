@@ -1,10 +1,11 @@
 import { Router, type Response } from 'express';
 import { z } from 'zod';
+import { assertSlotAvailable, canTransition, slotsForDoctor } from '../availability.js';
 import { writeAudit } from '../audit.js';
 import { newBookingRef, requireAuth, requireRoles } from '../auth.js';
 import { getDb } from '../db.js';
 import { HttpError, parseId } from '../http.js';
-import { getClinicZone, localToUtc, utcToLocal } from '../time.js';
+import { getClinicZone, localToUtc, minutesOf, utcToLocal } from '../time.js';
 
 const staffWrite = requireRoles('owner', 'receptionist');
 
@@ -220,20 +221,6 @@ function mapAppointment(row: ApptRow) {
   };
 }
 
-function hasOverlap(doctorId: number, startsAt: string, endsAt: string, excludeId?: number): boolean {
-  const row = getDb()
-    .prepare(
-      `SELECT id FROM appointments
-       WHERE doctor_id = ?
-         AND status != 'Cancelled'
-         AND starts_at < ?
-         AND ends_at > ?
-         AND (? IS NULL OR id != ?)
-       LIMIT 1`,
-    )
-    .get(doctorId, endsAt, startsAt, excludeId ?? null, excludeId ?? null);
-  return Boolean(row);
-}
 
 const paymentSchema = z
   .object({
@@ -654,9 +641,23 @@ clinicRouter.get(
     if (!query.employeeId || !query.date || !query.time || !query.duration) {
       throw new HttpError(400, 'VALIDATION', 'employeeId, date, time, and duration are required');
     }
-    const start = localToUtc(query.date, query.time, getClinicZone());
-    const end = start.plus({ minutes: query.duration });
-    res.json({ conflict: hasOverlap(Number(query.employeeId), start.toISO()!, end.toISO()!, query.excludeId ? Number(query.excludeId) : undefined) });
+    const linked = getDb()
+      .prepare('SELECT branch_id FROM doctor_branches WHERE doctor_id = ? LIMIT 1')
+      .get(Number(query.employeeId)) as { branch_id: number } | undefined;
+    const branchId = query.branchId ? Number(query.branchId) : linked?.branch_id;
+    if (!branchId) {
+      res.json({ conflict: true });
+      return;
+    }
+    const slots = slotsForDoctor({
+      doctorId: Number(query.employeeId),
+      branchId,
+      date: query.date,
+      duration: query.duration,
+      excludeId: query.excludeId ? Number(query.excludeId) : undefined,
+      enforceNotice: false,
+    });
+    res.json({ conflict: !slots.includes(query.time) });
   },
 );
 
@@ -697,8 +698,15 @@ clinicRouter.post('/appointments', staffWrite, validateBody(appointmentBody), (r
   const end = start.plus({ minutes: body.duration });
   const now = new Date().toISOString();
   const create = getDb().transaction(() => {
-    if (hasOverlap(Number(body.employeeId), start.toISO()!, end.toISO()!)) {
-      throw new HttpError(409, 'CONFLICT', 'That doctor is already booked for this time');
+    if (body.status !== 'Cancelled') {
+      assertSlotAvailable({
+        doctorId: Number(body.employeeId),
+        branchId: Number(body.branchId),
+        date: body.date,
+        time: body.time,
+        duration: body.duration,
+        enforceNotice: false,
+      });
     }
     const info = getDb()
       .prepare(
@@ -754,9 +762,20 @@ clinicRouter.patch('/appointments/:id', staffWrite, (req, res) => {
   const start = localToUtc(date, time, getClinicZone());
   const end = start.plus({ minutes: duration });
   const status = body.status ?? existing.status;
+  if (!canTransition(existing.status, status)) {
+    throw new HttpError(409, 'INVALID_TRANSITION', `Cannot change an appointment from ${existing.status} to ${status}`);
+  }
   const apply = getDb().transaction(() => {
-    if (status !== 'Cancelled' && hasOverlap(doctorId, start.toISO()!, end.toISO()!, id)) {
-      throw new HttpError(409, 'CONFLICT', 'That doctor is already booked for this time');
+    if (status !== 'Cancelled') {
+      assertSlotAvailable({
+        doctorId,
+        branchId: body.branchId ? Number(body.branchId) : existing.branch_id,
+        date,
+        time,
+        duration,
+        excludeId: id,
+        enforceNotice: false,
+      });
     }
     getDb()
       .prepare(
@@ -1019,6 +1038,146 @@ clinicRouter.delete('/waitlist/:id', staffWrite, (req, res) => {
   const info = getDb().prepare('DELETE FROM waitlist WHERE id = ?').run(id);
   if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Waitlist entry not found');
   writeAudit(req.user!, 'waitlist_deleted', `Deleted waitlist ${id}`);
+  res.json(true);
+});
+
+clinicRouter.post('/waitlist/:id/promote', staffWrite, (req, res) => {
+  const id = parseId(req.params.id, 'Waitlist entry');
+  const item = getDb().prepare('SELECT * FROM waitlist WHERE id = ?').get(id) as Parameters<typeof mapWait>[0] | undefined;
+  if (!item || item.status !== 'Waiting') throw new HttpError(404, 'NOT_FOUND', 'Waitlist entry not found');
+  const service = getDb().prepare('SELECT duration, price FROM services WHERE id = ? AND deleted_at IS NULL').get(item.service_id) as
+    | { duration: number; price: number }
+    | undefined;
+  if (!service) throw new HttpError(409, 'UNAVAILABLE', 'The requested service is no longer available');
+  const doctorId = item.doctor_id
+    ?? (getDb().prepare(`SELECT id FROM doctors WHERE deleted_at IS NULL AND status = 'Active' ORDER BY id LIMIT 1`).get() as { id: number } | undefined)?.id;
+  if (!doctorId) throw new HttpError(409, 'UNAVAILABLE', 'No doctor is available');
+  const slots = slotsForDoctor({
+    doctorId,
+    branchId: item.branch_id,
+    date: item.date,
+    duration: service.duration,
+    enforceNotice: false,
+  });
+  const windows: Record<string, [number, number]> = {
+    Morning: [0, 12 * 60],
+    Afternoon: [12 * 60, 17 * 60],
+    Evening: [17 * 60, 24 * 60],
+    Any: [0, 24 * 60],
+  };
+  const [from, to] = windows[item.time_pref] ?? windows.Any!;
+  const slot = slots.find((time) => {
+    const minute = minutesOf(time);
+    return minute >= from && minute < to;
+  });
+  if (!slot) throw new HttpError(409, 'UNAVAILABLE', 'No open slot matches this waitlist preference');
+  const start = localToUtc(item.date, slot, getClinicZone());
+  const end = start.plus({ minutes: service.duration });
+  const now = new Date().toISOString();
+  const create = getDb().transaction(() => {
+    assertSlotAvailable({
+      doctorId,
+      branchId: item.branch_id,
+      date: item.date,
+      time: slot,
+      duration: service.duration,
+      enforceNotice: false,
+    });
+    const info = getDb()
+      .prepare(
+        `INSERT INTO appointments (
+          branch_id, patient_id, service_id, doctor_id, starts_at, ends_at, duration_min, notes,
+          status, payment_status, payment_method, payment_amount, booking_ref, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Unpaid', 'Cash', ?, ?, 'waitlist', ?, ?)`,
+      )
+      .run(item.branch_id, item.patient_id, item.service_id, doctorId, start.toISO(), end.toISO(), service.duration, `Promoted from waitlist. ${item.notes}`, service.price, newBookingRef(), now, now);
+    getDb().prepare(`UPDATE waitlist SET status = 'Promoted' WHERE id = ?`).run(id);
+    return Number(info.lastInsertRowid);
+  });
+  const appointmentId = create.immediate();
+  writeAudit(req.user!, 'waitlist_promoted', `Promoted waitlist ${id} to appointment ${appointmentId}`);
+  res.status(201).json(mapAppointment(getDb().prepare('SELECT * FROM appointments WHERE id = ?').get(appointmentId) as ApptRow));
+});
+
+const timeOffBody = z.object({
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  reason: z.string().max(200).optional().default(''),
+  branchId: z.string().regex(/^\d+$/).optional(),
+});
+
+clinicRouter.get('/doctors/:id/time-off', (req, res) => {
+  const id = parseId(req.params.id, 'Doctor');
+  const rows = getDb()
+    .prepare('SELECT * FROM doctor_time_off WHERE doctor_id = ? ORDER BY starts_at')
+    .all(id) as Array<{ id: number; starts_at: string; ends_at: string; reason: string; branch_id: number | null }>;
+  res.json(rows.map((row) => ({
+    id: String(row.id),
+    doctorId: String(id),
+    branchId: row.branch_id == null ? null : String(row.branch_id),
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    reason: row.reason,
+  })));
+});
+
+clinicRouter.post('/doctors/:id/time-off', staffWrite, validateBody(timeOffBody), (req, res) => {
+  const id = parseId(req.params.id, 'Doctor');
+  const body = req.body as z.infer<typeof timeOffBody>;
+  if (body.endsAt <= body.startsAt) throw new HttpError(400, 'VALIDATION', 'Time off must end after it starts');
+  const info = getDb()
+    .prepare(`INSERT INTO doctor_time_off (doctor_id, branch_id, starts_at, ends_at, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, body.branchId ? Number(body.branchId) : null, body.startsAt, body.endsAt, body.reason, new Date().toISOString());
+  writeAudit(req.user!, 'time_off_created', `Added time off for doctor ${id}`);
+  res.status(201).json({ id: String(info.lastInsertRowid), doctorId: String(id), startsAt: body.startsAt, endsAt: body.endsAt, reason: body.reason });
+});
+
+clinicRouter.delete('/time-off/:id', staffWrite, (req, res) => {
+  const id = parseId(req.params.id, 'Time off');
+  const info = getDb().prepare('DELETE FROM doctor_time_off WHERE id = ?').run(id);
+  if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Time off not found');
+  res.json(true);
+});
+
+const holidayBody = z.object({
+  branchId: z.string().regex(/^\d+$/),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  label: z.string().trim().min(1).max(120),
+  preventBookings: z.boolean().optional().default(true),
+});
+
+clinicRouter.get('/holidays', (_req, res) => {
+  const rows = getDb().prepare('SELECT * FROM clinic_holidays ORDER BY date').all() as Array<{
+    id: number; branch_id: number; date: string; label: string; prevent_bookings: number;
+  }>;
+  res.json(rows.map((row) => ({
+    id: String(row.id),
+    orgId: 'clinic',
+    branchId: String(row.branch_id),
+    date: row.date,
+    label: row.label,
+    preventBookings: row.prevent_bookings === 1,
+  })));
+});
+
+clinicRouter.post('/holidays', staffWrite, validateBody(holidayBody), (req, res) => {
+  const body = req.body as z.infer<typeof holidayBody>;
+  try {
+    const info = getDb()
+      .prepare(`INSERT INTO clinic_holidays (branch_id, date, label, prevent_bookings) VALUES (?, ?, ?, ?)`)
+      .run(Number(body.branchId), body.date, body.label, body.preventBookings ? 1 : 0);
+    writeAudit(req.user!, 'holiday_created', `Closed ${body.date}`);
+    res.status(201).json({ id: String(info.lastInsertRowid), orgId: 'clinic', branchId: body.branchId, date: body.date, label: body.label, preventBookings: body.preventBookings });
+  } catch (error) {
+    if (String(error).includes('UNIQUE')) throw new HttpError(409, 'CONFLICT', 'That date is already closed');
+    throw error;
+  }
+});
+
+clinicRouter.delete('/holidays/:id', staffWrite, (req, res) => {
+  const id = parseId(req.params.id, 'Holiday');
+  const info = getDb().prepare('DELETE FROM clinic_holidays WHERE id = ?').run(id);
+  if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Holiday not found');
   res.json(true);
 });
 

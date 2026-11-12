@@ -73,7 +73,7 @@ export class ApiReservationRepository implements IReservationRepository {
   getByDateRange = (_orgId: string, branchId: string, start: string, end: string) =>
     list<Reservation>('/api/appointments', { branchId, start, end });
   async checkConflict(_orgId: string, _branchId: string, employeeId: string, date: string, time: string, duration: number, excludeId?: string) {
-    const result = await api<{ conflict: boolean }>(`/api/appointments/conflict${toQuery({ employeeId, date, time, duration, excludeId })}`);
+    const result = await api<{ conflict: boolean }>(`/api/appointments/conflict${toQuery({ branchId: _branchId, employeeId, date, time, duration, excludeId })}`);
     return result.conflict;
   }
 }

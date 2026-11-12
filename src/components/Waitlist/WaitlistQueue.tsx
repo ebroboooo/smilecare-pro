@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { db } from '../../db';
+import { db, DEMO_MODE } from '../../db';
+import { api, ApiError } from '../../db/api';
 import { Clock, Plus, Trash2, ArrowUpRight } from 'lucide-react';
 import { CLINIC_ID, type WaitlistRecord } from '../../types';
 
@@ -8,6 +9,7 @@ export const WaitlistQueue: React.FC = () => {
   const { waitlist, customers, services, employees, branches, refreshData, dispatchAuditLog, selectedBranchId, settings } = useApp();
   
   const [modalOpen, setModalOpen] = useState(false);
+  const [promoteError, setPromoteError] = useState('');
   const [formData, setFormData] = useState({
     customerId: customers[0]?.id || '',
     serviceId: services[0]?.id || '',
@@ -43,30 +45,33 @@ export const WaitlistQueue: React.FC = () => {
   };
 
   const handlePromote = async (item: WaitlistRecord) => {
-    const org = CLINIC_ID;
-    const selectedSrv = services.find(s => s.id === item.serviceId);
-    
-    const res = await db.reservations.create(org, {
-      branchId: item.branchId,
-      customerId: item.customerId,
-      serviceId: item.serviceId,
-      employeeId: item.employeeId || employees[0]?.id,
-      date: item.date,
-      time: "09:00",
-      duration: selectedSrv ? selectedSrv.duration : 30,
-      notes: `Promoted from Waitlist. Notes: ${item.notes}`,
-      status: 'Pending',
-      paymentStatus: 'Unpaid',
-      paymentDetails: {
-        method: 'Cash',
-        amount: selectedSrv ? selectedSrv.price : 0
+    setPromoteError('');
+    try {
+      if (!DEMO_MODE) {
+        await api(`/api/waitlist/${item.id}/promote`, { method: 'POST' });
+      } else {
+        const org = CLINIC_ID;
+        const selectedSrv = services.find(s => s.id === item.serviceId);
+        const res = await db.reservations.create(org, {
+          branchId: item.branchId,
+          customerId: item.customerId,
+          serviceId: item.serviceId,
+          employeeId: item.employeeId || employees[0]?.id,
+          date: item.date,
+          time: "09:00",
+          duration: selectedSrv ? selectedSrv.duration : 30,
+          notes: `Promoted from Waitlist. Notes: ${item.notes}`,
+          status: 'Pending',
+          paymentStatus: 'Unpaid',
+          paymentDetails: { method: 'Cash', amount: selectedSrv ? selectedSrv.price : 0 }
+        });
+        await db.waitlist.update(org, item.id, { status: 'Promoted' });
+        await dispatchAuditLog("Waitlist Promoted", `Successfully promoted waitlist ID ${item.id} to Reservation ID ${res.id}`);
       }
-    });
-
-    // Mark waitlist as Promoted
-    await db.waitlist.update(org, item.id, { status: 'Promoted' });
-    await dispatchAuditLog("Waitlist Promoted", `Successfully promoted waitlist ID ${item.id} to Reservation ID ${res.id}`);
-    await refreshData();
+      await refreshData();
+    } catch (err) {
+      setPromoteError(err instanceof ApiError ? err.message : 'Could not promote this waitlist entry');
+    }
   };
 
   const handleCancel = async (id: string) => {
@@ -104,6 +109,8 @@ export const WaitlistQueue: React.FC = () => {
           <span>Add to Waitlist</span>
         </button>
       </div>
+
+      {promoteError && <p className="text-sm text-red-600">{promoteError}</p>}
 
       {filteredWaitlist.length === 0 ? (
         <div className="card p-12 text-center border-slate-200 rounded-2xl">

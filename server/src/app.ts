@@ -7,6 +7,7 @@ import { errorHandler, requireCsrf } from './http.js';
 import { loadSession } from './auth.js';
 import { logger } from './logger.js';
 import { authRouter } from './routes/auth.js';
+import { publicRouter } from './routes/public.js';
 import { clinicRouter } from './routes/resources.js';
 
 export function createApp() {
@@ -44,6 +45,7 @@ export function createApp() {
     res.json({ ok: true });
   });
   app.use('/api', authRouter);
+  app.use('/api/public', publicRouter);
   app.use('/api', clinicRouter);
 
   app.use(errorHandler);

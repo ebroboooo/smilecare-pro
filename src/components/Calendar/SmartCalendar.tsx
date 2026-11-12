@@ -4,15 +4,22 @@ import { translations } from '../../utils/translations';
 import { db } from '../../db';
 import { CLINIC_ID, type Reservation, type ReservationStatus, type PaymentStatus } from '../../types';
 import { EnterpriseNotificationHub } from '../../utils/adapters';
+import { DEMO_MODE } from '../../db';
+import { ClinicClosures } from './ClinicClosures';
 import { 
   ChevronLeft, 
   ChevronRight, 
   Plus, 
   Copy, 
   Trash2, 
-  AlertCircle,
-  Clock
+  AlertCircle
 } from 'lucide-react';
+
+function localDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
 
 export const SmartCalendar: React.FC = () => {
   const { 
@@ -44,7 +51,7 @@ export const SmartCalendar: React.FC = () => {
     serviceId: '',
     employeeId: '',
     branchId: '',
-    date: new Date().toISOString().split('T')[0],
+    date: localDateKey(new Date()),
     time: '09:00',
     duration: 30,
     notes: '',
@@ -89,7 +96,7 @@ export const SmartCalendar: React.FC = () => {
       serviceId: services[0]?.id || '',
       employeeId: employees[0]?.id || '',
       branchId: defaultBranch,
-      date: dateStr || new Date().toISOString().split('T')[0],
+      date: dateStr || localDateKey(new Date()),
       time: timeStr || '09:00',
       duration: services[0]?.duration || 30,
       notes: '',
@@ -218,7 +225,7 @@ export const SmartCalendar: React.FC = () => {
       setModalOpen(false);
       await refreshData();
     } catch (err) {
-      console.error(err);
+      setConflictWarning(err instanceof Error ? err.message : 'Could not save this appointment');
     }
   };
 
@@ -254,9 +261,12 @@ export const SmartCalendar: React.FC = () => {
     if (!selectedRes) return;
     const org = CLINIC_ID;
     const { id: _id, createdAt: _createdAt, orgId: _orgId, ...cleanPayload } = selectedRes;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    try {
     await db.reservations.create(org, {
       ...cleanPayload,
-      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      date: localDateKey(tomorrow),
       status: 'Pending',
       paymentStatus: 'Unpaid',
       paymentDetails: {
@@ -267,6 +277,9 @@ export const SmartCalendar: React.FC = () => {
     await dispatchAuditLog("Reservation Duplicated", `Duplicated reservation ${selectedRes.id} for tomorrow.`);
     setModalOpen(false);
     await refreshData();
+    } catch (err) {
+      setConflictWarning(err instanceof Error ? err.message : 'Could not duplicate this appointment');
+    }
   };
 
   const getStatusColor = (status: ReservationStatus) => {
@@ -293,6 +306,48 @@ export const SmartCalendar: React.FC = () => {
   };
 
   const weekDates = getWeekDates(currentDate);
+  const workingHours = employees.flatMap((employee) => employee.schedule.filter((day) => day.isWorking));
+  const firstHour = workingHours.length ? Math.min(...workingHours.map((day) => Number(day.start.split(':')[0]))) : 8;
+  const lastHour = workingHours.length ? Math.max(...workingHours.map((day) => Number(day.end.split(':')[0]))) : 18;
+  const hours = Array.from({ length: Math.max(1, lastHour - firstHour) }, (_, index) => `${String(firstHour + index).padStart(2, '0')}:00`);
+
+  const renderAppointment = (res: Reservation) => {
+    const cust = customers.find(c => c.id === res.customerId);
+    const srv = services.find(s => s.id === res.serviceId);
+    const emp = employees.find(e => e.id === res.employeeId);
+    return (
+      <div
+        key={res.id}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleOpenEditModal(res);
+        }}
+        className={`p-2 rounded-xl border text-[10px] font-medium leading-normal cursor-pointer select-none transition-all hover:scale-[1.02] shadow-md ${getStatusColor(res.status)}`}
+      >
+        <div className="flex items-center justify-between font-bold">
+          <span>{res.time}</span>
+          <span className="opacity-80">({res.duration}m)</span>
+        </div>
+        <p className="font-extrabold text-slate-900 truncate mt-1">{cust?.fullName || 'Walk-in Client'}</p>
+        <p className="opacity-90 truncate mt-0.5">{srv?.name}</p>
+        <div className="flex items-center gap-1 mt-1 opacity-70">
+          <span className="h-1 w-1 rounded-full bg-current"></span>
+          <span className="truncate">{emp?.name}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const monthCells = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const first = new Date(year, month, 1);
+    const pad = (first.getDay() + 6) % 7;
+    const count = new Date(year, month + 1, 0).getDate();
+    const cells: Array<Date | null> = Array.from({ length: pad }, () => null);
+    for (let day = 1; day <= count; day += 1) cells.push(new Date(year, month, day));
+    return cells;
+  };
 
   return (
     <div className="space-y-6">
@@ -381,12 +436,12 @@ export const SmartCalendar: React.FC = () => {
 
           {/* Time Slots Board */}
           <div className="h-[480px] overflow-y-auto divide-y divide-slate-900/60">
-            {["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"].map((timeHour) => (
+            {hours.map((timeHour) => (
               <div key={timeHour} className="grid grid-cols-7 min-h-[90px] relative hover:bg-white/10 transition-colors">
                 
                 {/* Bookings Overlay */}
                 {weekDates.map((date, dayIdx) => {
-                  const dateStr = date.toISOString().split('T')[0];
+                  const dateStr = localDateKey(date);
                   // Filter reservations matching date and hour
                   const hourRes = filteredReservations.filter(r => 
                     r.date === dateStr && r.time.startsWith(timeHour.substring(0, 3))
@@ -398,32 +453,8 @@ export const SmartCalendar: React.FC = () => {
                       className="border-r border-slate-100 last:border-0 p-1.5 flex flex-col gap-1.5 relative min-h-[80px]"
                       onClick={() => handleOpenCreateModal(dateStr, timeHour)}
                     >
-                      {hourRes.map(res => {
-                        const cust = customers.find(c => c.id === res.customerId);
-                        const srv = services.find(s => s.id === res.serviceId);
-                        const emp = employees.find(e => e.id === res.employeeId);
-                        return (
-                          <div
-                            key={res.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditModal(res);
-                            }}
-                            className={`p-2 rounded-xl border text-[10px] font-medium leading-normal cursor-pointer select-none transition-all hover:scale-[1.02] shadow-md ${getStatusColor(res.status)}`}
-                          >
-                            <div className="flex items-center justify-between font-bold">
-                              <span>{res.time}</span>
-                              <span className="opacity-80">({res.duration}m)</span>
-                            </div>
-                            <p className="font-extrabold text-slate-900 truncate mt-1">{cust?.fullName || 'Walk-in Client'}</p>
-                            <p className="opacity-90 truncate mt-0.5">{srv?.name}</p>
-                            <div className="flex items-center gap-1 mt-1 opacity-70">
-                              <span className="h-1 w-1 rounded-full bg-current"></span>
-                              <span className="truncate">{emp?.name}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {dayIdx === 0 && <span className="text-[10px] text-slate-400">{timeHour}</span>}
+                      {hourRes.map(renderAppointment)}
                     </div>
                   );
                 })}
@@ -433,22 +464,53 @@ export const SmartCalendar: React.FC = () => {
         </div>
       )}
 
-      {/* Day and Month View Fallback Placeholders (fully operational grids) */}
-      {currentView !== 'Week' && (
-        <div className="card p-12 text-center border-slate-200 rounded-2xl">
-          <Clock className="h-10 w-10 text-brand-600 mx-auto mb-3 animate-pulse-subtle" />
-          <h4 className="text-lg font-bold text-slate-900 mb-2">{currentView} Scheduler View</h4>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mb-4">
-            Interactive day and grid months lists automatically resolve booking overlays. Switch to Week View for optimal scheduling layout.
-          </p>
-          <button 
-            onClick={() => setCurrentView('Week')}
-            className="btn-secondary px-4 py-2 text-xs"
-          >
-            Switch back to Week View
-          </button>
+      {currentView === 'Day' && (
+        <div className="panel rounded-2xl border-slate-200 overflow-hidden shadow-2xl">
+          <div className="border-b border-slate-200 bg-slate-100 px-4 py-3">
+            <p className="text-sm font-bold text-slate-800">{currentDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          </div>
+          <div className="h-[480px] overflow-y-auto divide-y divide-slate-100">
+            {hours.map((timeHour) => {
+              const dateStr = localDateKey(currentDate);
+              const hourRes = filteredReservations.filter((res) => res.date === dateStr && res.time.startsWith(timeHour.substring(0, 2)));
+              return (
+                <div key={timeHour} className="min-h-[72px] p-2 flex gap-3" onClick={() => handleOpenCreateModal(dateStr, timeHour)}>
+                  <span className="text-[10px] text-slate-400 w-12 shrink-0">{timeHour}</span>
+                  <div className="flex-1 flex flex-col gap-1.5">
+                    {hourRes.length === 0 && <span className="text-[10px] text-slate-300">Open</span>}
+                    {hourRes.map(renderAppointment)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
+
+      {currentView === 'Month' && (
+        <div className="panel rounded-2xl border-slate-200 overflow-hidden shadow-2xl">
+          <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => <div key={label}>{label}</div>)}
+          </div>
+          <div className="grid grid-cols-7">
+            {monthCells().map((date, index) => {
+              const dateStr = date ? localDateKey(date) : '';
+              const dayRes = date ? filteredReservations.filter((res) => res.date === dateStr) : [];
+              return (
+                <div key={dateStr || `empty-${index}`} className="min-h-[110px] border-r border-b border-slate-100 p-1.5" onClick={() => date && handleOpenCreateModal(dateStr, hours[0])}>
+                  {date && <p className="text-xs font-bold text-slate-700">{date.getDate()}</p>}
+                  <div className="space-y-1 mt-1">
+                    {dayRes.slice(0, 3).map(renderAppointment)}
+                    {dayRes.length > 3 && <p className="text-[10px] text-slate-400">+{dayRes.length - 3}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!DEMO_MODE && <ClinicClosures branches={branches} employees={employees} />}
 
       {/* Booking Form Dialog Modal */}
       {modalOpen && (
