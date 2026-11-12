@@ -5,6 +5,7 @@ import { DateTime } from 'luxon';
 import { z } from 'zod';
 import { assertSlotAvailable, readBookingRules, slotsForDoctor } from '../availability.js';
 import { newBookingRef } from '../auth.js';
+import { queueAppointmentAlert } from '../telegram.js';
 import { getDb } from '../db.js';
 import { HttpError } from '../http.js';
 import { getClinicZone, localToUtc, utcToLocal } from '../time.js';
@@ -185,6 +186,7 @@ publicRouter.post('/bookings', (req, res) => {
     return { id: Number(info.lastInsertRowid), reference };
   });
   const created = create.immediate();
+  queueAppointmentAlert(created.id);
   res.status(201).json({ reference: created.reference, manageToken: token });
 });
 

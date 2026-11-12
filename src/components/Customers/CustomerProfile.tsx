@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { db } from '../../db';
+import { db, DEMO_MODE } from '../../db';
+import { api, ApiError } from '../../db/api';
 import { CLINIC_ID } from '../../types';
 import { translations } from '../../utils/translations';
 import { 
@@ -21,6 +22,8 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
   
   const customer = customers.find(c => c.id === customerId);
   const [newNote, setNewNote] = useState('');
+  const [linkNote, setLinkNote] = useState('');
+  const [linkError, setLinkError] = useState('');
   const lang = settings?.language || 'en';
   const t = translations[lang];
 
@@ -87,6 +90,25 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
           </div>
           <div className="text-center md:text-left space-y-1">
             <h3 className="text-xl font-bold text-slate-900">{customer.fullName}</h3>
+            {!DEMO_MODE && (
+              <button
+                type="button"
+                className="btn-secondary text-xs mt-2"
+                onClick={async () => {
+                  setLinkError('');
+                  try {
+                    const result = await api<{ instruction: string }>(`/api/patients/${customer.id}/telegram-link`, { method: 'POST' });
+                    setLinkNote(result.instruction);
+                  } catch (err) {
+                    setLinkError(err instanceof ApiError ? err.message : 'Could not create a Telegram link');
+                  }
+                }}
+              >
+                Telegram link
+              </button>
+            )}
+            {linkNote && <p className="text-xs text-slate-600 break-all max-w-md">{linkNote}</p>}
+            {linkError && <p className="text-xs text-red-600">{linkError}</p>}
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs text-slate-400">
               <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{customer.phone}</span>
               <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{customer.email}</span>

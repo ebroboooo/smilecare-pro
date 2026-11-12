@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { db } from '../../db';
+import { api, ApiError } from '../../db/api';
 import { CLINIC_ID } from '../../types';
 import { DEMO_MODE } from '../../db';
 import { translations } from '../../utils/translations';
@@ -20,6 +21,8 @@ export const Settings: React.FC = () => {
   const lang = settings?.language || 'en';
   const t = translations[lang];
 
+  const [telegram, setTelegram] = useState({ chatId: '', enabled: false, token: '', tokenSet: false });
+  const [telegramError, setTelegramError] = useState('');
   const [confirmFreshStart, setConfirmFreshStart] = useState(false);
   const [confirmDemoLoad, setConfirmDemoLoad] = useState(false);
 
@@ -54,6 +57,12 @@ export const Settings: React.FC = () => {
         timezone: settings.timezone || 'Africa/Cairo',
       });
       setRules(settings.bookingRules);
+      setTelegram((current) => ({
+        chatId: settings.telegramChatId || '',
+        enabled: settings.telegramEnabled === true,
+        token: current.token,
+        tokenSet: settings.telegramTokenSet === true,
+      }));
     }
   }, [settings]);
 
@@ -316,6 +325,59 @@ export const Settings: React.FC = () => {
                 </button>
               </div>
             </div>
+          )}
+
+          {!DEMO_MODE && (
+            <form
+              className="space-y-3 border-t border-slate-200 pt-4"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setTelegramError('');
+                try {
+                  await api('/api/settings', {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                      telegramChatId: telegram.chatId,
+                      telegramEnabled: telegram.enabled,
+                      ...(telegram.token ? { telegramBotToken: telegram.token } : {}),
+                    }),
+                  });
+                  setTelegram((current) => ({ ...current, token: '' }));
+                  await refreshData();
+                  success('Telegram settings saved.');
+                } catch (err) {
+                  setTelegramError(err instanceof ApiError ? err.message : 'Could not save Telegram settings');
+                }
+              }}
+            >
+              <h4 className="font-bold text-slate-900 text-sm">Telegram</h4>
+              <p className="text-[10px] text-slate-500">The bot token is stored on the server and is not shown again. Reminders go to the clinic chat and to patients who link their chat.</p>
+              <label className="flex items-center justify-between text-xs font-bold text-slate-900">
+                Send Telegram alerts
+                <input type="checkbox" checked={telegram.enabled} onChange={(event) => setTelegram({ ...telegram, enabled: event.target.checked })} />
+              </label>
+              <input className="input-field text-xs" placeholder="Staff chat id" value={telegram.chatId} onChange={(event) => setTelegram({ ...telegram, chatId: event.target.value })} />
+              <input className="input-field text-xs" type="password" autoComplete="new-password" placeholder={telegram.tokenSet ? 'Token saved — enter a new one to replace it' : 'Bot token'} value={telegram.token} onChange={(event) => setTelegram({ ...telegram, token: event.target.value })} />
+              {telegramError && <p className="text-xs text-red-600">{telegramError}</p>}
+              <div className="flex gap-2">
+                <button className="btn-primary text-xs" type="submit">Save Telegram</button>
+                <button
+                  className="btn-secondary text-xs"
+                  type="button"
+                  onClick={async () => {
+                    setTelegramError('');
+                    try {
+                      await api('/api/settings/telegram-test', { method: 'POST' });
+                      success('Test message sent.');
+                    } catch (err) {
+                      setTelegramError(err instanceof ApiError ? err.message : 'Test message failed');
+                    }
+                  }}
+                >
+                  Send test
+                </button>
+              </div>
+            </form>
           )}
         </div>
       )}

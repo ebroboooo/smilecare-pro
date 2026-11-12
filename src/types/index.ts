@@ -198,4 +198,7 @@ export interface SystemSettings {
     telegramNotifications: boolean;
     publicBookingEnabled: boolean;
   };
+  telegramChatId?: string;
+  telegramEnabled?: boolean;
+  telegramTokenSet?: boolean;
 }

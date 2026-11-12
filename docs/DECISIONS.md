@@ -25,3 +25,9 @@
 - Appointment status changes follow Pending → Confirmed or Cancelled, then Confirmed → Completed, Cancelled, or No Show. Completed, Cancelled, and No Show do not change again.
 - The public site reads the clinic name, services, and doctors from the API. The contact form creates a lead. Payment copy stays pay-at-clinic.
 - Landing and the public booking page switch between English and Arabic, including RTL. Staff screens that already had translations keep them; closure labels on the calendar stay English.
+
+## 2026-11-12 — Phase 3
+
+- Telegram runs only on the API, using grammY long polling. The bot starts when a token is saved and alerts are turned on. The web app never receives the token back; the settings response has `telegramTokenSet` and the chat id only.
+- Staff alerts include Confirm and Cancel buttons. A patient link is a one-time `/start` token stored as a hash. Reminders for the next 24 hours are recorded in `reminders` and are not sent twice for the same appointment.
+- The in-app notification list was already loaded from `/api/notifications`. Public bookings add a row there as well as a Telegram alert when the bot is configured.

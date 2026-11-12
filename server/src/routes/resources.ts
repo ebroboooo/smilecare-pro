@@ -2,9 +2,10 @@ import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { assertSlotAvailable, canTransition, slotsForDoctor } from '../availability.js';
 import { writeAudit } from '../audit.js';
+import { createPatientLink, queueAppointmentAlert, refreshTelegramBot, sendTelegramTest } from '../telegram.js';
 import { newBookingRef, requireAuth, requireRoles } from '../auth.js';
 import { getDb } from '../db.js';
-import { HttpError, parseId } from '../http.js';
+import { HttpError, asyncHandler, parseId } from '../http.js';
 import { getClinicZone, localToUtc, minutesOf, utcToLocal } from '../time.js';
 
 const staffWrite = requireRoles('owner', 'receptionist');
@@ -258,6 +259,9 @@ function mapSettings(row: {
   timezone: string;
   features_json: string;
   booking_rules_json: string;
+  telegram_bot_token: string | null;
+  telegram_chat_id: string | null;
+  telegram_enabled: number;
 }) {
   return {
     orgId: 'clinic',
@@ -282,6 +286,9 @@ function mapSettings(row: {
       cancelWindowHours: number;
       slotIntervalMinutes: number;
     },
+    telegramChatId: row.telegram_chat_id || '',
+    telegramEnabled: row.telegram_enabled === 1,
+    telegramTokenSet: Boolean(row.telegram_bot_token),
   };
 }
 
@@ -745,6 +752,7 @@ clinicRouter.post('/appointments', staffWrite, validateBody(appointmentBody), (r
     throw error;
   }
   writeAudit(req.user!, 'appointment_created', `Created appointment ${id}`);
+  queueAppointmentAlert(id);
   const row = getDb().prepare('SELECT * FROM appointments WHERE id = ?').get(id) as ApptRow;
   res.status(201).json(mapAppointment(row));
 });
@@ -1289,12 +1297,19 @@ const settingsPatch = z.object({
       slotIntervalMinutes: z.number().int().min(5).max(180).optional(),
     })
     .optional(),
+  telegramBotToken: z.string().trim().min(20).max(200).optional(),
+  telegramChatId: z.string().trim().max(40).optional(),
+  telegramEnabled: z.boolean().optional(),
 });
 
 clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
   const body = settingsPatch.parse(req.body);
   const current = readSettings();
-  const features = { ...current.features, ...(body.features ?? {}) };
+  const features = {
+    ...current.features,
+    ...(body.features ?? {}),
+    ...(body.telegramEnabled === undefined ? {} : { telegramNotifications: body.telegramEnabled }),
+  };
   const bookingRules = { ...current.bookingRules, ...(body.bookingRules ?? {}) };
   const next = {
     businessName: body.businessName ?? current.businessName,
@@ -1334,8 +1349,32 @@ clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
     if (String(error).includes('UNIQUE')) throw new HttpError(409, 'CONFLICT', 'That public booking link is already in use');
     throw error;
   }
+  if (body.telegramBotToken) {
+    getDb().prepare('UPDATE settings SET telegram_bot_token = ? WHERE id = 1').run(body.telegramBotToken);
+  }
+  if (body.telegramChatId !== undefined) {
+    getDb().prepare('UPDATE settings SET telegram_chat_id = ? WHERE id = 1').run(body.telegramChatId);
+  }
+  if (body.telegramEnabled !== undefined) {
+    getDb().prepare('UPDATE settings SET telegram_enabled = ? WHERE id = 1').run(body.telegramEnabled ? 1 : 0);
+  }
+  void refreshTelegramBot();
   writeAudit(req.user!, 'settings_updated', 'Clinic settings updated');
   res.json(readSettings());
+});
+
+clinicRouter.post('/settings/telegram-test', requireRoles('owner'), asyncHandler(async (_req, res) => {
+  await sendTelegramTest();
+  res.json({ ok: true });
+}));
+
+clinicRouter.post('/patients/:id/telegram-link', staffWrite, (req, res) => {
+  const id = parseId(req.params.id, 'Patient');
+  const patient = getDb().prepare('SELECT id FROM patients WHERE id = ? AND deleted_at IS NULL').get(id);
+  if (!patient) throw new HttpError(404, 'NOT_FOUND', 'Patient not found');
+  const link = createPatientLink(id);
+  writeAudit(req.user!, 'telegram_link_created', `Created a Telegram link for patient ${id}`);
+  res.status(201).json({ token: link.token, instruction: `Ask the patient to open the clinic bot and send /start ${link.token}` });
 });
 
 clinicRouter.get('/audit', (_req, res) => {
