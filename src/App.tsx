@@ -25,6 +25,7 @@ const Settings = React.lazy(() => import('./components/Settings/Settings').then(
 const UserManagement = React.lazy(() => import('./components/Users/UserManagement').then(m => ({ default: m.UserManagement })));
 const BookingPortal = React.lazy(() => import('./components/BookingPortal/BookingPortal').then(m => ({ default: m.BookingPortal })));
 const LandingPage = React.lazy(() => import('./components/Landing/LandingPage').then(m => ({ default: m.LandingPage })));
+const PrivacyPage = React.lazy(() => import('./components/Landing/PrivacyPage').then(m => ({ default: m.PrivacyPage })));
 
 const LazyFallback = () => <PageLoader />;
 
@@ -238,6 +239,11 @@ export const App: React.FC = () => {
                   <Route path="/admin/users" element={<RequireRole role="owner"><RouteTitle title="Staff Accounts"><UserManagement /></RouteTitle></RequireRole>} />
                 </Route>
 
+                <Route path="/privacy" element={
+                  <RouteTitle title="Privacy">
+                    <PrivacyPage />
+                  </RouteTitle>
+                } />
                 <Route path="/book/:slug" element={
                   <RouteTitle title="Book Appointment">
                     <BookingPortal />

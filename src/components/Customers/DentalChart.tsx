@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../../db/api';
 
 const TEETH = [
@@ -34,7 +34,7 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
   const [visit, setVisit] = useState({ visitedOn: new Date().toISOString().slice(0, 10), complaint: '', diagnosis: '', treatment: '' });
   const [payment, setPayment] = useState({ amount: '', method: 'Cash' as 'Cash' | 'Card', note: '' });
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const [chart, visitRows, money] = await Promise.all([
       api<{ teeth: ToothRow[] }>(`/api/patients/${patientId}/odontogram`),
       api<VisitRow[]>(`/api/patients/${patientId}/visits`),
@@ -46,11 +46,11 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
     setVisits(visitRows);
     setPayments(money.payments);
     setBalance(money);
-  };
+  }, [patientId]);
 
   useEffect(() => {
     load().catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load the chart'));
-  }, [patientId]);
+  }, [load]);
 
   const condition = teeth[selected]?.condition || 'Sound';
 

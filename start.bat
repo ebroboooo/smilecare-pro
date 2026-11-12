@@ -1,16 +1,9 @@
 @echo off
-echo ========================================================
-echo Starting SmileCare Pro - Development Server
-echo ========================================================
-echo.
-
-echo Checking dependencies...
+cd /d "%~dp0"
+if not exist "server\.env" copy "server\.env.example" "server\.env"
 call npm install
-
-echo.
-echo Starting development server...
-echo A new browser window should open shortly.
-echo.
-call npm run dev
-
-pause
+if errorlevel 1 exit /b 1
+call npm run build
+if errorlevel 1 exit /b 1
+set NODE_ENV=production
+call npm start

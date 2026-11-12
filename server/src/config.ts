@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 
 export const DEV_SESSION_SECRET = 'dev-only-change-me';
@@ -24,7 +25,23 @@ export function assertProductionSecret(nodeEnv: string, secret: string | undefin
   }
 }
 
+function loadEnvFile(): void {
+  for (const candidate of [path.resolve(process.cwd(), '.env'), path.resolve(process.cwd(), 'server', '.env')]) {
+    if (!fs.existsSync(candidate)) continue;
+    for (const line of fs.readFileSync(candidate, 'utf8').split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq < 1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      if (process.env[key] !== undefined) continue;
+      process.env[key] = trimmed.slice(eq + 1).trim();
+    }
+  }
+}
+
 export function loadConfig(): AppConfig {
+  loadEnvFile();
   const nodeEnv = process.env.NODE_ENV || 'development';
   const fromEnv = process.env.SESSION_SECRET;
   assertProductionSecret(nodeEnv, fromEnv);

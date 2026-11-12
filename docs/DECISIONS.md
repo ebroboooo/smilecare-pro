@@ -38,3 +38,13 @@
 - A visit is a dated note with complaint, diagnosis, and treatment. It is not a treatment plan.
 - Balance is the sum of appointment fees, excluding cancelled appointments, minus cash and card payments recorded for that patient. Doctors can read the balance. Only an owner or receptionist can record a payment.
 - Treatment plans, file attachments, medical-alert banners, and richer reports are not in this phase.
+
+## 2026-11-12 — Phase 5
+
+- A public booking is stored only when the request includes `consent: true`. The form has a required checkbox and a link to `/privacy`. The privacy page describes what this installation stores. It does not claim GDPR, HIPAA, or any other certification.
+- Any signed-in staff member can export one patient as JSON. Only the owner can anonymize. Anonymize replaces the name and contact fields, clears notes and the Telegram link, and keeps appointments, visits, the tooth chart, and payments.
+- Request logs record the method, path, and status. They do not record the body. The bot token is redacted and is not written back to the browser.
+- `npm run backup` in `server/` uses SQLite's online backup. Restore is documented as stop, replace the file, start. The repository does not install a daily schedule.
+- Production mode serves the built website from the API. `Dockerfile`, `docker-compose.yml`, and `Caddyfile` are samples. They were not launched in this session. `start.bat` and `start.sh` install, build, and start. `scripts/setup-clinic.ps1` writes `server/.env` only when that file is missing, including a generated `SESSION_SECRET`.
+- GitHub Actions runs install, typecheck, lint, test, and build. Playwright is not installed, so there is no browser job.
+- The API reads `server/.env` or `.env` for variables that are not already set. A variable already in the process environment wins.

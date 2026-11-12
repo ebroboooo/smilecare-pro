@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { db, DEMO_MODE } from '../../db';
 import { api, ApiError } from '../../db/api';
 import { DentalChart } from './DentalChart';
@@ -20,6 +21,7 @@ interface Props {
 
 export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
   const { customers, reservations, services, employees, settings, refreshData, dispatchAuditLog } = useApp();
+  const { currentUser } = useAuth();
   
   const customer = customers.find(c => c.id === customerId);
   const [newNote, setNewNote] = useState('');
@@ -109,6 +111,38 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
               </button>
             )}
             {linkNote && <p className="text-xs text-slate-600 break-all max-w-md">{linkNote}</p>}
+            {!DEMO_MODE && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button
+                  type="button"
+                  className="btn-secondary text-xs"
+                  onClick={async () => {
+                    const data = await api<unknown>(`/api/patients/${customer.id}/export`);
+                    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `patient-${customer.id}.json`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  Export record
+                </button>
+                {currentUser?.role === 'owner' && (
+                  <button
+                    type="button"
+                    className="btn-secondary text-xs"
+                    onClick={async () => {
+                      if (!window.confirm('Replace this patient name and contact details with an anonymized record?')) return;
+                      await api(`/api/patients/${customer.id}/anonymize`, { method: 'POST' });
+                      await refreshData();
+                    }}
+                  >
+                    Anonymize
+                  </button>
+                )}
+              </div>
+            )}
             {linkError && <p className="text-xs text-red-600">{linkError}</p>}
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs text-slate-400">
               <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{customer.phone}</span>

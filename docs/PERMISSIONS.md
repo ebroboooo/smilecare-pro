@@ -16,6 +16,11 @@ Roles are `owner`, `receptionist`, and `doctor`. Every API route below is enforc
 | Read the activity log | Yes | Yes | Yes |
 | Add an activity entry | Yes | Yes | Yes |
 | Delete or edit an activity entry | No | No | No |
+| Update the tooth chart or a visit note | Yes | Yes | Yes |
+| Record a payment | Yes | Yes | No |
+| Export one patient record | Yes | Yes | Yes |
+| Anonymize a patient | Yes | No | No |
+| Save Telegram settings or send a test | Yes | No | No |
 
 A doctor who calls an owner or receptionist route receives **403**. A signed-out request receives **401**. A temporary password must be changed before any other clinic route will succeed.
 

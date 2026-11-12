@@ -1,0 +1,17 @@
+services:
+  smilecare:
+    build: .
+    ports:
+      - "8080:3001"
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      CLIENT_ORIGIN: https://clinic.example.com
+      SESSION_SECRET: ${SESSION_SECRET}
+      DATABASE_PATH: /data/smilecare.db
+      TRUST_PROXY: "1"
+    volumes:
+      - smilecare-data:/data
+
+volumes:
+  smilecare-data:

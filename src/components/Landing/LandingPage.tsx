@@ -206,6 +206,7 @@ export const LandingPage: React.FC = () => {
             ))}
             {clinic?.phone && <p className="flex items-center gap-2 text-sm text-slate-700"><Phone className="h-4 w-4 text-brand-600" /> {clinic.phone}</p>}
             {clinic?.email && <p className="flex items-center gap-2 text-sm text-slate-700"><Mail className="h-4 w-4 text-brand-600" /> {clinic.email}</p>}
+            <Link to="/privacy" className="text-sm text-brand-700 underline">Privacy</Link>
             <p className="text-sm text-slate-600">{copy.landingPay}</p>
           </div>
           <form onSubmit={sendLead} className="card p-8 space-y-4">

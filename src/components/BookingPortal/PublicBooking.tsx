@@ -58,6 +58,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
   const [companyWebsite, setCompanyWebsite] = useState('');
+  const [consent, setConsent] = useState(false);
   const [formError, setFormError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reference, setReference] = useState(params.get('ref') || '');
@@ -147,6 +148,10 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
       setFormError(copy.landingNoSlots);
       return;
     }
+    if (!consent) {
+      setFormError(copy.landingConsent);
+      return;
+    }
     setBusy(true);
     try {
       const created = await api<{ reference: string; manageToken: string }>('/api/public/bookings', {
@@ -162,6 +167,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
           date,
           time,
           notes,
+          consent: true,
         }),
       });
       if (created.reference === 'RECEIVED') {
@@ -288,6 +294,10 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
                 <input className="input-field" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
                 <label className="block text-xs font-semibold text-slate-500">{copy.notes}</label>
                 <textarea className="input-field" value={notes} onChange={(event) => setNotes(event.target.value)} />
+                <label className="flex items-start gap-2 text-sm text-slate-700">
+                  <input type="checkbox" className="mt-1" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
+                  <span>{copy.landingConsent} <Link to="/privacy" className="text-brand-700 underline">Privacy</Link></span>
+                </label>
                 {formError && <p className="text-sm text-red-600">{formError}</p>}
                 <div className="flex gap-3">
                   <button type="button" className="btn-secondary flex-1" onClick={() => setStep(1)}><ArrowLeft className="h-4 w-4" /> {copy.cancel}</button>

@@ -40,6 +40,7 @@ const bookBody = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^\d{2}:\d{2}$/),
   notes: z.string().max(2000).optional().default(''),
+  consent: z.literal(true),
 });
 
 const leadBody = z.object({

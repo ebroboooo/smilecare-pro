@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -10,6 +12,7 @@ import { authRouter } from './routes/auth.js';
 import { publicRouter } from './routes/public.js';
 import { clinicRouter } from './routes/resources.js';
 import { dentalRouter } from './routes/dental.js';
+import { privacyRouter } from './routes/privacy.js';
 
 export function createApp() {
   const config = loadConfig();
@@ -49,6 +52,19 @@ export function createApp() {
   app.use('/api/public', publicRouter);
   app.use('/api', clinicRouter);
   app.use('/api', dentalRouter);
+  app.use('/api', privacyRouter);
+
+  if (process.env.NODE_ENV === 'production') {
+    const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../dist');
+    app.use(express.static(distDir));
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api')) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(distDir, 'index.html'));
+    });
+  }
 
   app.use(errorHandler);
   return app;

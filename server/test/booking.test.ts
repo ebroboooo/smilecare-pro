@@ -82,6 +82,7 @@ describe('booking integrity and public portal', () => {
       time: '10:00',
       notes: '',
       companyWebsite: '',
+      consent: true,
     };
     const [first, second] = await Promise.all([
       request(app).post('/api/public/bookings').set(CSRF).send(payload),
@@ -128,6 +129,7 @@ describe('booking integrity and public portal', () => {
       serviceId: String(services.body[0].id),
       date,
       time: '11:00',
+      consent: true,
     });
     expect(sent.status).toBe(201);
     expect(sent.body.reference).toBe('RECEIVED');

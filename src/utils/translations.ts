@@ -128,6 +128,7 @@ export const translations = {
     faqBookA: "Choose a service, doctor, and an open time. You pay at the clinic.",
     faqPayQ: "When do I pay?",
     faqPayA: "Payment is collected at the clinic by cash or card. This site does not take online payment.",
+    landingConsent: "I agree that the clinic may store this request so it can contact me about the appointment.",
   },
   ar: {
     appName: "سمايل كير برو",
@@ -258,6 +259,7 @@ export const translations = {
     faqBookA: "اختر الخدمة والطبيب ووقتاً متاحاً. الدفع يتم في العيادة.",
     faqPayQ: "متى أدفع؟",
     faqPayA: "يتم الدفع في العيادة نقداً أو بالبطاقة. هذا الموقع لا يستقبل دفعاً إلكترونياً.",
+    landingConsent: "أوافق على أن تحتفظ العيادة بهذا الطلب حتى تتواصل معي بخصوص الموعد.",
   }
 };
 
