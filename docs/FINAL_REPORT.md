@@ -11,7 +11,7 @@ Date: 2026-11-12. This report matches the requirement IDs in `docs/AUDIT_REPORT.
 | 2 | `30abd15` | Availability and public booking |
 | 3 | `ff3d7b1` | Telegram alerts on the API |
 | 4 | `21876bd` | Tooth chart, visit notes, balances |
-| 5 | recorded in git after this file is committed | Privacy, backup, packaging |
+| 5 | `d54f807` | Privacy, backup, packaging |
 
 ## Verification run for Phase 5
 
