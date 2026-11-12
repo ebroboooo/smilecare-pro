@@ -55,8 +55,31 @@ describe('telegram settings stay server-side', () => {
     expect(saved.body.telegramChatId).toBe('555');
     expect(saved.body.telegramEnabled).toBe(true);
 
+    const WHATSAPP_SECRET = 'EAAB-whatsapp-token-not-a-real-secret-value';
+    const messaging = await owner.patch('/api/settings').set(CSRF).send({
+      telegramBotUsername: '@SmileCareClinicBot',
+      telegramReminderHours: 12,
+      whatsappPhoneNumberId: '123456789012345',
+      whatsappAccessToken: WHATSAPP_SECRET,
+      whatsappBusinessAccountId: '998877665544',
+      whatsappTestRecipient: '201012345678',
+    });
+    expect(messaging.status).toBe(200);
+    expect(JSON.stringify(messaging.body)).not.toContain(SECRET);
+    expect(JSON.stringify(messaging.body)).not.toContain(WHATSAPP_SECRET);
+    expect(messaging.body.telegramBotUsername).toBe('SmileCareClinicBot');
+    expect(messaging.body.telegramReminderHours).toBe(12);
+    expect(messaging.body.whatsappTokenSet).toBe(true);
+    expect(messaging.body.whatsappPhoneNumberId).toBe('123456789012345');
+    expect(messaging.body.whatsappLastStatus).toBe('');
+
+    const notSent = await owner.post('/api/settings/whatsapp-test').set(CSRF);
+    expect(notSent.status).toBe(501);
+    expect(JSON.stringify(notSent.body)).not.toContain('"delivered":true');
+
     const again = await owner.get('/api/settings');
     expect(JSON.stringify(again.body)).not.toContain(SECRET);
+    expect(JSON.stringify(again.body)).not.toContain(WHATSAPP_SECRET);
     expect(again.body.features.telegramNotifications).toBe(true);
 
     const branchId = (await owner.get('/api/branches')).body[0].id as string;
@@ -101,6 +124,7 @@ describe('telegram settings stay server-side', () => {
     const link = await owner.post(`/api/patients/${patient.body.id}/telegram-link`).set(CSRF);
     expect(link.status).toBe(201);
     expect(link.body.token).toHaveLength(32);
+    expect(link.body.instruction).toContain(`https://t.me/SmileCareClinicBot?start=${link.body.token}`);
     expect(JSON.stringify(again.body)).not.toContain(link.body.token);
 
     const { claimReminder } = await import('../src/telegram.js');

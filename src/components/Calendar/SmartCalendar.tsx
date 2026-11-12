@@ -382,7 +382,7 @@ export const SmartCalendar: React.FC = () => {
             onChange={(e) => setEmployeeFilter(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none"
           >
-            <option value="all">Filter by Staff (All)</option>
+            <option value="all">{t.allDoctors}</option>
             {employees.map(e => (
               <option key={e.id} value={e.id}>{e.name} ({e.role})</option>
             ))}
@@ -397,7 +397,7 @@ export const SmartCalendar: React.FC = () => {
                   currentView === view ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-800'
                 }`}
               >
-                {view}
+                {view === 'Day' ? t.viewDay : view === 'Week' ? t.viewWeek : t.viewMonth}
               </button>
             ))}
           </div>

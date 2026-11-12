@@ -14,6 +14,8 @@ interface TelegramConfig {
   token: string;
   chatId: string;
   enabled: boolean;
+  username: string;
+  reminderHours: number;
 }
 
 function sha256(value: string): string {
@@ -21,15 +23,23 @@ function sha256(value: string): string {
 }
 
 export function readTelegramConfig(): TelegramConfig {
-  const row = getDb().prepare('SELECT telegram_bot_token, telegram_chat_id, telegram_enabled FROM settings WHERE id = 1').get() as {
+  const row = getDb().prepare(
+    `SELECT telegram_bot_token, telegram_chat_id, telegram_enabled, telegram_bot_username, telegram_reminder_hours
+     FROM settings WHERE id = 1`,
+  ).get() as {
     telegram_bot_token: string | null;
     telegram_chat_id: string | null;
     telegram_enabled: number;
+    telegram_bot_username: string | null;
+    telegram_reminder_hours: number | null;
   };
+  const hours = Number(row.telegram_reminder_hours || 24);
   return {
     token: row.telegram_bot_token || '',
     chatId: row.telegram_chat_id || '',
     enabled: row.telegram_enabled === 1,
+    username: (row.telegram_bot_username || '').replace(/^@/, ''),
+    reminderHours: Number.isFinite(hours) ? Math.min(72, Math.max(1, hours)) : 24,
   };
 }
 
@@ -162,12 +172,16 @@ export async function sendTelegramTest(): Promise<void> {
   }
 }
 
-export function createPatientLink(patientId: number): { token: string } {
+export function createPatientLink(patientId: number): { token: string; instruction: string } {
   const token = randomBytes(16).toString('hex');
   getDb()
     .prepare(`INSERT INTO telegram_links (patient_id, chat_id, link_token_hash, created_at) VALUES (?, 'pending', ?, ?)`)
     .run(patientId, sha256(token), new Date().toISOString());
-  return { token };
+  const username = readTelegramConfig().username;
+  const instruction = username
+    ? `Ask the patient to open https://t.me/${username}?start=${token}`
+    : `Ask the patient to open the clinic bot and send /start ${token}`;
+  return { token, instruction };
 }
 
 async function deliverReminder(appointmentId: number) {
@@ -203,7 +217,7 @@ export async function sendDueReminders(): Promise<void> {
   const config = readTelegramConfig();
   if (!config.enabled || !config.token) return;
   const now = new Date();
-  const soon = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const soon = new Date(now.getTime() + config.reminderHours * 60 * 60 * 1000).toISOString();
   const rows = getDb().prepare(
     `SELECT a.id FROM appointments a
      WHERE a.status IN ('Pending', 'Confirmed')

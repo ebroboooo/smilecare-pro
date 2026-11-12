@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { AppProvider } from './context/AppContext';
+import { AppProvider, useApp } from './context/AppContext';
 import { ToastProvider } from './context/ToastContext';
 import { PageLoader } from './components/ui/LoadingSpinner';
 import { RouteTitle } from './components/ui/RouteTitle';
@@ -9,8 +9,11 @@ import { NotFoundPage } from './components/ui/NotFoundPage';
 import { DEMO_MODE } from './db';
 import { mockDbInstance } from './db/mockRepository';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { LanguageSwitch } from './components/ui/LanguageSwitch';
 import { Smile, UserCheck } from 'lucide-react';
 import type { UserRole } from './types';
+import { translations, type Language } from './utils/translations';
+import { applyDocumentLanguage, readPublicLanguage, writePublicLanguage } from './utils/publicLanguage';
 
 const DashboardLayout = React.lazy(() => import('./components/Layout/DashboardLayout').then(m => ({ default: m.DashboardLayout })));
 const Dashboard = React.lazy(() => import('./components/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -63,12 +66,23 @@ const RequireRole: React.FC<{ role: UserRole; children: React.ReactNode }> = ({ 
 const Login: React.FC = () => {
   const { login, setup, currentUser, needsSetup } = useAuth();
   const navigate = useNavigate();
+  const [lang, setLang] = useState<Language>(() => readPublicLanguage() ?? 'en');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [businessName, setBusinessName] = useState('SmileCare Dental Clinic');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const t = translations[lang];
+
+  useEffect(() => {
+    applyDocumentLanguage(lang);
+  }, [lang]);
+
+  const chooseLang = (next: Language) => {
+    writePublicLanguage(next);
+    setLang(next);
+  };
 
   useEffect(() => {
     if (currentUser) navigate('/admin/dashboard', { replace: true });
@@ -86,28 +100,31 @@ const Login: React.FC = () => {
       }
       navigate('/admin/dashboard', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.');
+      setError(err instanceof Error ? err.message : t.signInError);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleResetDemo = () => {
-    if (window.confirm('This will reset all clinic data and reload the dental demo dataset. Continue?')) {
+    if (window.confirm(t.resetDemoConfirm)) {
       mockDbInstance.resetPreset('Dental');
       window.location.reload();
     }
   };
 
   return (
-    <RouteTitle title={needsSetup ? 'Create Clinic Owner' : 'Staff Sign In'}>
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <RouteTitle title={needsSetup ? t.setupTitle : t.loginTitle}>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
         <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-white to-brand-50 pointer-events-none" />
 
         <div className="panel w-full max-w-md p-8 shadow-elevated relative space-y-6">
+          <div className="flex justify-end">
+            <LanguageSwitch lang={lang} onChange={chooseLang} />
+          </div>
           {DEMO_MODE && (
-            <p className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center">
-              Demo mode. Data stays in this browser and is not a clinic record.
+            <p className="text-sm font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center">
+              {t.demoBanner}
             </p>
           )}
           <div className="text-center space-y-2">
@@ -115,8 +132,8 @@ const Login: React.FC = () => {
               <Smile className="h-6 w-6" />
             </div>
             <h2 className="text-2xl font-display font-bold text-slate-900 tracking-tight">SmileCare Pro</h2>
-            <p className="text-xs text-slate-500">
-              {needsSetup ? 'Create the owner account for this clinic' : 'Secure access to your clinic dashboard'}
+            <p className="text-sm text-slate-600">
+              {needsSetup ? t.setupSubtitle : t.loginSubtitle}
             </p>
           </div>
 
@@ -124,43 +141,43 @@ const Login: React.FC = () => {
             {needsSetup && (
               <>
                 <div>
-                  <label htmlFor="setup-business" className="block text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1.5">Clinic name</label>
+                  <label htmlFor="setup-business" className="block text-sm font-medium text-slate-700 mb-1.5">{t.clinicName}</label>
                   <input id="setup-business" required value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="input-field" />
                 </div>
                 <div>
-                  <label htmlFor="setup-name" className="block text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1.5">Your name</label>
+                  <label htmlFor="setup-name" className="block text-sm font-medium text-slate-700 mb-1.5">{t.yourName}</label>
                   <input id="setup-name" required value={name} onChange={(e) => setName(e.target.value)} className="input-field" autoComplete="name" />
                 </div>
               </>
             )}
             <div>
-              <label htmlFor="login-email" className="block text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1.5">Email Address</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-1.5">{t.email}</label>
               <input id="login-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-field" autoComplete="email" />
             </div>
             <div>
-              <label htmlFor="login-password" className="block text-xs text-slate-500 uppercase tracking-wider font-semibold mb-1.5">Password</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1.5">{t.password}</label>
               <input id="login-password" type="password" required minLength={needsSetup ? 10 : 4} value={password} onChange={(e) => setPassword(e.target.value)} className="input-field" autoComplete={needsSetup ? 'new-password' : 'current-password'} />
             </div>
 
             {error && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2" role="alert">{error}</p>
+              <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2" role="alert">{error}</p>
             )}
 
             <button type="submit" disabled={isSubmitting} className="btn-primary w-full py-3">
               <UserCheck className="h-4 w-4" />
-              {isSubmitting ? 'Please wait...' : needsSetup ? 'Create owner account' : 'Sign In'}
+              {isSubmitting ? t.pleaseWait : needsSetup ? t.createOwner : t.signIn}
             </button>
           </form>
 
           <div className="pt-4 border-t border-slate-100 text-center space-y-3">
-            {!needsSetup && <p className="text-xs text-slate-400">Forgot your password? Ask a clinic owner to reset it.</p>}
+            {!needsSetup && <p className="text-sm text-slate-500">{t.forgotPassword}</p>}
             {DEMO_MODE && (
               <button onClick={handleResetDemo} type="button" className="text-xs bg-brand-50 border border-brand-200 text-brand-700 font-semibold px-4 py-2 rounded-xl hover:bg-brand-100 transition-all">
-                Reset Demo Data
+                {t.resetDemo}
               </button>
             )}
             <div>
-              <a href="/" className="text-xs text-slate-400 hover:text-brand-600 transition-colors">← Back to patient website</a>
+              <a href="/" className="text-sm text-slate-500 hover:text-brand-600 transition-colors">{t.backToSite}</a>
             </div>
           </div>
         </div>
@@ -171,6 +188,9 @@ const Login: React.FC = () => {
 
 const ChangePassword: React.FC = () => {
   const { changePassword, logout } = useAuth();
+  const { settings } = useApp();
+  const lang: Language = settings?.language === 'ar' ? 'ar' : (readPublicLanguage() ?? 'en');
+  const t = translations[lang];
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState('');
@@ -183,22 +203,24 @@ const ChangePassword: React.FC = () => {
     try {
       await changePassword(currentPassword, newPassword);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not change the password');
+      setError(err instanceof Error ? err.message : t.passwordError);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <form onSubmit={handleSubmit} className="panel w-full max-w-md p-8 space-y-4">
-        <h1 className="text-xl font-bold text-slate-900">Choose a new password</h1>
-        <p className="text-xs text-slate-500">This temporary password must be replaced before you can use the clinic.</p>
-        <input className="input-field" type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Temporary password" autoComplete="current-password" />
-        <input className="input-field" type="password" required minLength={10} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" autoComplete="new-password" />
-        {error && <p className="text-xs text-red-600" role="alert">{error}</p>}
-        <button className="btn-primary w-full" disabled={isSubmitting} type="submit">Save password</button>
-        <button className="btn-secondary w-full" type="button" onClick={() => void logout()}>Sign out</button>
+        <h1 className="text-xl font-bold text-slate-900">{t.changePasswordTitle}</h1>
+        <p className="text-sm text-slate-600">{t.changePasswordHelp}</p>
+        <label className="block text-sm font-medium text-slate-700">{t.tempPassword}</label>
+        <input className="input-field" type="password" required value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} autoComplete="current-password" />
+        <label className="block text-sm font-medium text-slate-700">{t.newPassword}</label>
+        <input className="input-field" type="password" required minLength={10} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
+        {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+        <button className="btn-primary w-full" disabled={isSubmitting} type="submit">{isSubmitting ? t.pleaseWait : t.savePassword}</button>
+        <button className="btn-secondary w-full" type="button" onClick={() => void logout()}>{t.logout}</button>
       </form>
     </div>
   );

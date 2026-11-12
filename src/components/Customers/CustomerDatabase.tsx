@@ -4,6 +4,8 @@ import { db } from '../../db';
 import { CustomerProfile } from './CustomerProfile';
 import { CLINIC_ID } from '../../types';
 import { Search, UserPlus, Filter, Phone, Mail, Award } from 'lucide-react';
+import { translations } from '../../utils/translations';
+import { formatMoney, statusText } from '../../utils/locale';
 
 export const CustomerDatabase: React.FC = () => {
   const { customers, refreshData, dispatchAuditLog, settings } = useApp();
@@ -22,7 +24,9 @@ export const CustomerDatabase: React.FC = () => {
     status: 'Active' as 'Active' | 'Inactive'
   });
 
-  const currency = settings?.currency || 'USD';
+  const lang = settings?.language || 'en';
+  const t = translations[lang];
+  const currency = settings?.currency || 'EGP';
 
   // Get unique tags for filtering
   const allTags = Array.from(
@@ -64,7 +68,7 @@ export const CustomerDatabase: React.FC = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete profile for ${name}?`)) {
+    if (window.confirm(t.deletePatientConfirm)) {
       const org = CLINIC_ID;
       await db.customers.delete(org, id);
       await dispatchAuditLog("Patient Deleted", `Removed patient profile: ${name}`);
@@ -80,7 +84,7 @@ export const CustomerDatabase: React.FC = () => {
           onClick={() => setSelectedCustomerId(null)}
           className="btn-secondary px-4 py-2 text-xs"
         >
-          ← Back to Patient Database
+          {t.backToPatients}
         </button>
         <CustomerProfile customerId={selectedCustomerId} />
       </div>
@@ -92,8 +96,8 @@ export const CustomerDatabase: React.FC = () => {
       
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Patient Database</h2>
-          <p className="text-xs text-slate-500">Manage patient contact details, tags, logs, and total spendings</p>
+          <h2 className="text-xl font-bold text-slate-900">{t.patientsTitle}</h2>
+          <p className="text-sm text-slate-500">{t.patientsHelp}</p>
         </div>
         
         <button 
@@ -101,20 +105,20 @@ export const CustomerDatabase: React.FC = () => {
           className="btn-primary px-3 py-2 text-xs flex items-center gap-1.5"
         >
           <UserPlus className="h-4 w-4" />
-          <span>Register Patient</span>
+          <span>{t.newPatient}</span>
         </button>
       </div>
 
       {/* Search & Filter Header Row */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-50 border border-slate-200 p-4 rounded-2xl">
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3.5 top-2.5 h-4.5 w-4.5 text-slate-500" />
+          <Search className="absolute start-3.5 top-2.5 h-4.5 w-4.5 text-slate-500" />
           <input
             type="text"
-            placeholder="Search by name, phone, or email..."
+            placeholder={t.searchPatients}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full input-field text-xs pl-10"
+            className="w-full input-field text-xs ps-10"
           />
         </div>
 
@@ -125,7 +129,7 @@ export const CustomerDatabase: React.FC = () => {
             onChange={(e) => setTagFilter(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none"
           >
-            <option value="all">Filter by Tag (All)</option>
+            <option value="all">{t.allTags}</option>
             {allTags.map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
@@ -138,8 +142,11 @@ export const CustomerDatabase: React.FC = () => {
         {filteredCustomers.length === 0 ? (
           <div className="col-span-full card p-12 text-center border-slate-200 rounded-2xl">
             <Search className="h-10 w-10 text-slate-500 mx-auto mb-3" />
-            <h4 className="text-sm font-bold text-slate-700">No patients found</h4>
-            <p className="text-xs text-slate-500 mt-1">Refine your search parameters or register a new patient.</p>
+            <h4 className="text-sm font-bold text-slate-700">{searchQuery || tagFilter !== 'all' ? t.noPatientsSearch : t.noPatients}</h4>
+            <p className="text-sm text-slate-500 mt-1">{searchQuery || tagFilter !== 'all' ? t.searchPatients : t.noPatientsHelp}</p>
+            {!searchQuery && tagFilter === 'all' && (
+              <button type="button" onClick={() => setModalOpen(true)} className="btn-primary text-xs mt-4">{t.newPatient}</button>
+            )}
           </div>
         ) : (
           filteredCustomers.map(cust => (
@@ -156,7 +163,7 @@ export const CustomerDatabase: React.FC = () => {
                     >
                       {cust.fullName}
                     </h4>
-                    <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{cust.status}</span>
+                    <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{statusText(t, cust.status)}</span>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center font-extrabold text-brand-700 border border-slate-200">
                     {cust.fullName.charAt(0)}
@@ -174,7 +181,7 @@ export const CustomerDatabase: React.FC = () => {
                   </p>
                   <p className="flex items-center gap-2">
                     <Award className="h-3.5 w-3.5 text-green-500" />
-                    <span className="font-semibold text-slate-800">Spending: {cust.totalSpending} {currency}</span>
+                    <span className="font-semibold text-slate-800">{t.spending}: {formatMoney(cust.totalSpending, currency, lang)}</span>
                   </p>
                 </div>
 
@@ -195,14 +202,14 @@ export const CustomerDatabase: React.FC = () => {
                   onClick={() => setSelectedCustomerId(cust.id)}
                   className="text-xs text-brand-600 hover:text-brand-700 font-bold tracking-wide"
                 >
-                  View Profile Timeline →
+                  {t.viewPatient}
                 </button>
                 
                 <button
                   onClick={() => handleDelete(cust.id, cust.fullName)}
                   className="opacity-0 group-hover:opacity-100 text-xs text-red-500 hover:text-red-400 font-semibold transition-opacity"
                 >
-                  Delete
+                  {t.delete}
                 </button>
               </div>
             </div>
@@ -214,11 +221,11 @@ export const CustomerDatabase: React.FC = () => {
       {modalOpen && (
         <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Register Patient</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">{t.newPatient}</h3>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Full Name</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.landingFullName}</label>
                 <input
                   type="text"
                   required
@@ -230,7 +237,7 @@ export const CustomerDatabase: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Phone Number</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">{t.phone}</label>
                   <input
                     type="tel"
                     required
@@ -240,7 +247,7 @@ export const CustomerDatabase: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Email Address</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">{t.email}</label>
                   <input
                     type="email"
                     required
@@ -252,18 +259,18 @@ export const CustomerDatabase: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Tags (Comma separated)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.tagsHint}</label>
                 <input
                   type="text"
                   value={formData.tags}
                   onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-                  placeholder="VIP, Regular, Local..."
+                  placeholder=""
                   className="w-full input-field text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Notes</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.notes}</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
@@ -278,13 +285,13 @@ export const CustomerDatabase: React.FC = () => {
                   onClick={() => setModalOpen(false)}
                   className="btn-secondary px-4 py-2 text-xs"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary px-4 py-2 text-xs"
                 >
-                  Register
+                  {t.register}
                 </button>
               </div>
             </form>

@@ -5,6 +5,9 @@ import { api, ApiError, toQuery } from '../../db/api';
 import { BusinessNotFound } from './BusinessNotFound';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { translations, type Language } from '../../utils/translations';
+import { formatMoney } from '../../utils/locale';
+import { applyDocumentLanguage, readPublicLanguage, writePublicLanguage } from '../../utils/publicLanguage';
+import { LanguageSwitch } from '../ui/LanguageSwitch';
 
 interface PublicClinic {
   businessName: string;
@@ -43,7 +46,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
   const [params] = useSearchParams();
   const [clinic, setClinic] = useState<PublicClinic | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>(() => readPublicLanguage() ?? 'en');
   const [services, setServices] = useState<PublicService[]>([]);
   const [doctors, setDoctors] = useState<PublicDoctor[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
@@ -70,9 +73,13 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
   const copy = translations[lang];
 
   useEffect(() => {
-    document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
-    document.documentElement.setAttribute('lang', lang);
+    applyDocumentLanguage(lang);
   }, [lang]);
+
+  const chooseLang = (next: Language) => {
+    writePublicLanguage(next);
+    setLang(next);
+  };
 
   useEffect(() => {
     let active = true;
@@ -80,12 +87,12 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
       .then((data) => {
         if (!active) return;
         setClinic(data);
-        setLang(data.language === 'ar' ? 'ar' : 'en');
+        if (!readPublicLanguage()) setLang(data.language === 'ar' ? 'ar' : 'en');
         const first = data.branches[0];
         if (first) setBranchId(String(first.id));
       })
       .catch((error: unknown) => {
-        if (active) setLoadError(error instanceof Error ? error.message : 'Could not load the clinic');
+        if (active) setLoadError(error instanceof Error ? error.message : copy.couldNotLoad);
       });
     return () => {
       active = false;
@@ -115,7 +122,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
     if (!reference || !manageToken || reference === 'RECEIVED') return;
     api<{ status: string }>(`/api/public/bookings/${reference}${toQuery({ token: manageToken })}`)
       .then((row) => setBookingStatus(row.status))
-      .catch((error: unknown) => setFormError(error instanceof Error ? error.message : 'Booking not found'));
+      .catch((error: unknown) => setFormError(error instanceof Error ? error.message : copy.bookingNotFound));
   }, [reference, manageToken]);
 
   if (loadError) {
@@ -131,7 +138,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
   if (!clinic) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <LoadingSpinner size="lg" label="Loading booking portal..." />
+        <LoadingSpinner size="lg" label={copy.loadingBooking} />
       </div>
     );
   }
@@ -180,7 +187,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
       setBookingStatus('Pending');
       setStep(3);
     } catch (error) {
-      setFormError(error instanceof ApiError ? error.message : 'Could not book this time');
+      setFormError(error instanceof ApiError ? error.message : copy.couldNotBook);
     } finally {
       setBusy(false);
     }
@@ -197,7 +204,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
       setDate(moved.date);
       setTime(moved.time);
     } catch (error) {
-      setFormError(error instanceof ApiError ? error.message : 'Could not move this booking');
+      setFormError(error instanceof ApiError ? error.message : copy.couldNotMove);
     } finally {
       setBusy(false);
     }
@@ -213,7 +220,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
       });
       setBookingStatus(result.status);
     } catch (error) {
-      setFormError(error instanceof ApiError ? error.message : 'Could not cancel');
+      setFormError(error instanceof ApiError ? error.message : copy.couldNotCancel);
     } finally {
       setBusy(false);
     }
@@ -227,9 +234,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
             <div className="bg-brand-600 p-2 rounded-xl text-white"><Smile className="h-5 w-5" /></div>
             <span className="font-display font-bold text-slate-900">{clinic.businessName}</span>
           </Link>
-          <button type="button" className="btn-ghost text-xs" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>
-            {lang === 'en' ? 'العربية' : 'English'}
-          </button>
+          <LanguageSwitch lang={lang} onChange={chooseLang} />
         </div>
 
         {!clinic.publicBookingEnabled && (
@@ -254,7 +259,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
                 <select className="input-field" value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
                   <option value="">{copy.service}</option>
                   {services.map((item) => (
-                    <option key={item.id} value={String(item.id)}>{item.name} — {item.price} {clinic.currency}</option>
+                    <option key={item.id} value={String(item.id)}>{item.name} — {formatMoney(item.price, clinic.currency, lang)}</option>
                   ))}
                 </select>
                 <label className="block text-xs font-semibold text-slate-500">{copy.doctor}</label>
@@ -277,13 +282,14 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
                   </div>
                 )}
                 <button type="button" className="btn-primary w-full" disabled={!serviceId || !doctorId || !time} onClick={() => setStep(2)}>
-                  {copy.confirm} <ArrowRight className="h-4 w-4" />
+                  {copy.confirm} <ArrowRight className={`h-4 w-4 ${lang === 'ar' ? 'rotate-180' : ''}`} />
                 </button>
               </>
             )}
             {step === 2 && (
               <form onSubmit={submit} className="space-y-4">
-                <p className="text-sm text-slate-600">{service?.name} · {doctor?.name} · {date} {time}</p>
+                <h2 className="text-lg font-semibold text-slate-900">{copy.yourDetails}</h2>
+                <p className="text-sm text-slate-600">{service?.name} · {doctor?.name} · {date} {time}{service ? ` · ${formatMoney(service.price, clinic.currency, lang)}` : ''}</p>
                 <p className="text-sm text-slate-600">{copy.landingPay}</p>
                 <input className="absolute opacity-0 h-0 w-0" tabIndex={-1} autoComplete="off" value={companyWebsite} onChange={(event) => setCompanyWebsite(event.target.value)} aria-hidden="true" />
                 <label className="block text-xs font-semibold text-slate-500">{copy.landingFullName}</label>
@@ -296,12 +302,12 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
                 <textarea className="input-field" value={notes} onChange={(event) => setNotes(event.target.value)} />
                 <label className="flex items-start gap-2 text-sm text-slate-700">
                   <input type="checkbox" className="mt-1" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
-                  <span>{copy.landingConsent} <Link to="/privacy" className="text-brand-700 underline">Privacy</Link></span>
+                  <span>{copy.landingConsent} <Link to="/privacy" className="text-brand-700 underline">{copy.privacy}</Link></span>
                 </label>
                 {formError && <p className="text-sm text-red-600">{formError}</p>}
                 <div className="flex gap-3">
-                  <button type="button" className="btn-secondary flex-1" onClick={() => setStep(1)}><ArrowLeft className="h-4 w-4" /> {copy.cancel}</button>
-                  <button type="submit" className="btn-primary flex-[2]" disabled={busy}>{busy ? '...' : copy.landingBook}</button>
+                  <button type="button" className="btn-secondary flex-1" onClick={() => setStep(1)}><ArrowLeft className={`h-4 w-4 ${lang === 'ar' ? 'rotate-180' : ''}`} /> {copy.back}</button>
+                  <button type="submit" className="btn-primary flex-[2]" disabled={busy}>{busy ? copy.pleaseWait : copy.landingBook}</button>
                 </div>
               </form>
             )}
@@ -319,9 +325,14 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
             {reference && date && time && <p className="text-sm text-slate-700">{date} {time}</p>}
             {bookingStatus !== 'Cancelled' && manageToken && (
               <div className="space-y-3 text-start">
+                <p className="text-sm font-medium text-slate-700">{copy.moveAppointment}</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <input className="input-field" type="date" value={moveDate} onChange={(event) => setMoveDate(event.target.value)} />
-                  <input className="input-field" type="time" value={moveTime} onChange={(event) => setMoveTime(event.target.value)} />
+                  <label className="block text-xs font-medium text-slate-600">{copy.newDate}
+                    <input className="input-field mt-1" type="date" value={moveDate} onChange={(event) => setMoveDate(event.target.value)} />
+                  </label>
+                  <label className="block text-xs font-medium text-slate-600">{copy.newTime}
+                    <input className="input-field mt-1" type="time" value={moveTime} onChange={(event) => setMoveTime(event.target.value)} />
+                  </label>
                 </div>
                 <div className="flex gap-3">
                   <button type="button" className="btn-primary flex-1" disabled={busy} onClick={reschedule}>{copy.reschedule}</button>

@@ -6,6 +6,7 @@ import { api, ApiError } from '../../db/api';
 import { DentalChart } from './DentalChart';
 import { CLINIC_ID } from '../../types';
 import { translations } from '../../utils/translations';
+import { formatMoney, statusText } from '../../utils/locale';
 import { 
   Phone, 
   Mail, 
@@ -31,7 +32,7 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
   const t = translations[lang];
 
   if (!customer) {
-    return <div className="text-red-500 text-sm">Patient profile not found.</div>;
+    return <div className="text-red-500 text-sm">{t.patientNotFound}</div>;
   }
 
   // Filter reservations
@@ -42,7 +43,7 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
   const upcomingReservations = customerReservations.filter(r => r.status === 'Pending' || r.status === 'Confirmed');
   const pastReservations = customerReservations.filter(r => r.status === 'Completed' || r.status === 'Cancelled' || r.status === 'NoShow');
 
-  const currency = settings?.currency || 'USD';
+  const currency = settings?.currency || 'EGP';
 
   // Handle adding notes
   const handleAddNote = async (e: React.FormEvent) => {
@@ -91,7 +92,7 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
           <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-violet-600 text-white flex items-center justify-center font-extrabold text-2xl border border-brand-500/20 shadow-lg">
             {customer.fullName.charAt(0)}
           </div>
-          <div className="text-center md:text-left space-y-1">
+          <div className="text-center md:text-start space-y-1">
             <h3 className="text-xl font-bold text-slate-900">{customer.fullName}</h3>
             {!DEMO_MODE && (
               <button
@@ -103,11 +104,11 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
                     const result = await api<{ instruction: string }>(`/api/patients/${customer.id}/telegram-link`, { method: 'POST' });
                     setLinkNote(result.instruction);
                   } catch (err) {
-                    setLinkError(err instanceof ApiError ? err.message : 'Could not create a Telegram link');
+                    setLinkError(err instanceof ApiError ? err.message : t.couldNotLink);
                   }
                 }}
               >
-                Telegram link
+                {t.telegramLink}
               </button>
             )}
             {linkNote && <p className="text-xs text-slate-600 break-all max-w-md">{linkNote}</p>}
@@ -126,19 +127,19 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
                     URL.revokeObjectURL(url);
                   }}
                 >
-                  Export record
+                  {t.exportRecord}
                 </button>
                 {currentUser?.role === 'owner' && (
                   <button
                     type="button"
                     className="btn-secondary text-xs"
                     onClick={async () => {
-                      if (!window.confirm('Replace this patient name and contact details with an anonymized record?')) return;
+                      if (!window.confirm(t.anonymizeConfirm)) return;
                       await api(`/api/patients/${customer.id}/anonymize`, { method: 'POST' });
                       await refreshData();
                     }}
                   >
-                    Anonymize
+                    {t.anonymize}
                   </button>
                 )}
               </div>
@@ -154,10 +155,10 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
         <div className="flex gap-4 z-10">
           <div className="card bg-slate-50/60 px-5 py-3 rounded-2xl text-center border-slate-200">
             <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t.revenue}</p>
-            <p className="text-xl font-extrabold text-green-400 mt-1">{customer.totalSpending} {currency}</p>
+            <p className="text-xl font-extrabold text-green-400 mt-1">{formatMoney(customer.totalSpending, currency, lang)}</p>
           </div>
           <div className="card bg-slate-50/60 px-5 py-3 rounded-2xl text-center border-slate-200">
-            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Bookings</p>
+            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">{t.bookingsCount}</p>
             <p className="text-xl font-extrabold text-slate-900 mt-1">{customerReservations.length}</p>
           </div>
         </div>
@@ -172,11 +173,11 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
           <div className="card p-5 rounded-2xl border-slate-200 space-y-4">
             <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
               <Calendar className="h-4.5 w-4.5 text-brand-600" />
-              <span>Upcoming Appointments</span>
+              <span>{t.upcomingAppointments}</span>
             </h4>
 
             {upcomingReservations.length === 0 ? (
-              <p className="text-xs text-slate-500 py-3">No upcoming appointments scheduled.</p>
+              <p className="text-xs text-slate-500 py-3">{t.noUpcomingPatient}</p>
             ) : (
               <div className="space-y-3">
                 {upcomingReservations.map(res => {
@@ -186,10 +187,10 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
                     <div key={res.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
                       <div className="space-y-1">
                         <p className="text-xs font-bold text-slate-900">{srv?.name}</p>
-                        <p className="text-[10px] text-slate-400">{res.date} at {res.time} • Staff: {emp?.name}</p>
+                        <p className="text-[10px] text-slate-400">{res.date} {t.at} {res.time} · {emp?.name || t.unassigned}</p>
                       </div>
                       <span className="text-[10px] font-bold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                        {res.status}
+                        {statusText(t, res.status)}
                       </span>
                     </div>
                   );
@@ -202,21 +203,21 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
           <div className="card p-5 rounded-2xl border-slate-200 space-y-4">
             <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
               <Clock className="h-4.5 w-4.5 text-slate-400" />
-              <span>Past Booking History</span>
+              <span>{t.pastVisits}</span>
             </h4>
 
             {pastReservations.length === 0 ? (
-              <p className="text-xs text-slate-500 py-3">No past records found.</p>
+              <p className="text-xs text-slate-500 py-3">{t.noPastVisits}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-start text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-450 uppercase tracking-widest text-[9px] font-bold">
-                      <th className="py-2.5">Date</th>
-                      <th className="py-2.5">Service</th>
-                      <th className="py-2.5">Staff</th>
-                      <th className="py-2.5">Status</th>
-                      <th className="py-2.5 text-right">Paid</th>
+                      <th className="py-2.5">{t.date}</th>
+                      <th className="py-2.5">{t.service}</th>
+                      <th className="py-2.5">{t.doctor}</th>
+                      <th className="py-2.5">{t.status}</th>
+                      <th className="py-2.5 text-end">{t.paid}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-850/60 text-slate-700 font-semibold">
@@ -232,11 +233,11 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
                             <span className={`px-2 py-0.5 rounded text-[9px] uppercase tracking-wider font-bold ${
                               res.status === 'Completed' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                             }`}>
-                              {res.status}
+                              {statusText(t, res.status)}
                             </span>
                           </td>
-                          <td className="py-2.5 text-right font-bold text-slate-800">
-                            {res.paymentDetails?.amount || 0} {currency}
+                          <td className="py-2.5 text-end font-bold text-slate-800">
+                            {formatMoney(res.paymentDetails?.amount || 0, currency, lang)}
                           </td>
                         </tr>
                       );
@@ -254,13 +255,13 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
           <div className="card p-5 rounded-2xl border-slate-200 space-y-4">
             <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
               <MessageSquare className="h-4.5 w-4.5 text-brand-600" />
-              <span>Notes Timeline Diary</span>
+              <span>{t.notesTitle}</span>
             </h4>
 
             {/* Note creation */}
             <form onSubmit={handleAddNote} className="space-y-3">
               <textarea
-                placeholder="Enter patient status, allergies, treatment notes, or booking preferences..."
+                placeholder={t.notePlaceholder}
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 rows={2}
@@ -271,16 +272,16 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
                 className="btn-primary w-full py-2 text-xs flex items-center justify-center gap-1"
               >
                 <Plus className="h-4 w-4" />
-                <span>Save Note Log</span>
+                <span>{t.saveNote}</span>
               </button>
             </form>
 
             {/* Notes Timeline List */}
             <div className="space-y-4 pt-2">
               {timelineLogs.length === 0 ? (
-                <p className="text-xs text-slate-500 text-center py-4">No notes recorded yet.</p>
+                <p className="text-xs text-slate-500 text-center py-4">{t.noNotes}</p>
               ) : (
-                <div className="relative border-l border-slate-200 pl-4 space-y-4">
+                <div className="relative border-s border-slate-200 ps-4 space-y-4">
                   {timelineLogs.map((log) => (
                     <div key={log.id} className="relative space-y-1">
                       {/* Timeline dot */}

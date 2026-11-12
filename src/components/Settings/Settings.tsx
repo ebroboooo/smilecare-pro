@@ -21,8 +21,10 @@ export const Settings: React.FC = () => {
   const lang = settings?.language || 'en';
   const t = translations[lang];
 
-  const [telegram, setTelegram] = useState({ chatId: '', enabled: false, token: '', tokenSet: false });
+  const [telegram, setTelegram] = useState({ chatId: '', enabled: false, token: '', tokenSet: false, username: '', reminderHours: 24 });
   const [telegramError, setTelegramError] = useState('');
+  const [whatsapp, setWhatsapp] = useState({ phoneNumberId: '', businessAccountId: '', testRecipient: '', token: '', tokenSet: false, lastStatus: '' });
+  const [whatsappError, setWhatsappError] = useState('');
   const [confirmFreshStart, setConfirmFreshStart] = useState(false);
   const [confirmDemoLoad, setConfirmDemoLoad] = useState(false);
 
@@ -62,6 +64,16 @@ export const Settings: React.FC = () => {
         enabled: settings.telegramEnabled === true,
         token: current.token,
         tokenSet: settings.telegramTokenSet === true,
+        username: settings.telegramBotUsername || '',
+        reminderHours: settings.telegramReminderHours || 24,
+      }));
+      setWhatsapp((current) => ({
+        phoneNumberId: settings.whatsappPhoneNumberId || '',
+        businessAccountId: settings.whatsappBusinessAccountId || '',
+        testRecipient: settings.whatsappTestRecipient || '',
+        token: current.token,
+        tokenSet: settings.whatsappTokenSet === true,
+        lastStatus: settings.whatsappLastStatus || '',
       }));
     }
   }, [settings]);
@@ -339,42 +351,124 @@ export const Settings: React.FC = () => {
                     body: JSON.stringify({
                       telegramChatId: telegram.chatId,
                       telegramEnabled: telegram.enabled,
+                      telegramBotUsername: telegram.username.replace(/^@/, ''),
+                      telegramReminderHours: Number(telegram.reminderHours) || 24,
                       ...(telegram.token ? { telegramBotToken: telegram.token } : {}),
                     }),
                   });
                   setTelegram((current) => ({ ...current, token: '' }));
                   await refreshData();
-                  success('Telegram settings saved.');
+                  success(t.telegramSaved);
                 } catch (err) {
-                  setTelegramError(err instanceof ApiError ? err.message : 'Could not save Telegram settings');
+                  setTelegramError(err instanceof ApiError ? err.message : t.telegramFailed);
                 }
               }}
             >
-              <h4 className="font-bold text-slate-900 text-sm">Telegram</h4>
-              <p className="text-[10px] text-slate-500">The bot token is stored on the server and is not shown again. Reminders go to the clinic chat and to patients who link their chat.</p>
-              <label className="flex items-center justify-between text-xs font-bold text-slate-900">
-                Send Telegram alerts
+              <h4 className="font-bold text-slate-900 text-sm">{t.telegramAlerts}</h4>
+              <p className="text-xs text-slate-500">{t.telegramHelp}</p>
+              <label className="flex items-center justify-between text-sm font-medium text-slate-900">
+                {t.sendAlerts}
                 <input type="checkbox" checked={telegram.enabled} onChange={(event) => setTelegram({ ...telegram, enabled: event.target.checked })} />
               </label>
-              <input className="input-field text-xs" placeholder="Staff chat id" value={telegram.chatId} onChange={(event) => setTelegram({ ...telegram, chatId: event.target.value })} />
-              <input className="input-field text-xs" type="password" autoComplete="new-password" placeholder={telegram.tokenSet ? 'Token saved — enter a new one to replace it' : 'Bot token'} value={telegram.token} onChange={(event) => setTelegram({ ...telegram, token: event.target.value })} />
-              {telegramError && <p className="text-xs text-red-600">{telegramError}</p>}
+              <label className="block text-sm font-medium text-slate-700">{t.botUsername}</label>
+              <input className="input-field text-sm" placeholder="SmileCareClinicBot" value={telegram.username} onChange={(event) => setTelegram({ ...telegram, username: event.target.value })} />
+              <p className="text-xs text-slate-500">{t.botUsernameHint}</p>
+              <label className="block text-sm font-medium text-slate-700">{t.staffChatId}</label>
+              <input className="input-field text-sm" placeholder="123456789" value={telegram.chatId} onChange={(event) => setTelegram({ ...telegram, chatId: event.target.value })} />
+              <label className="block text-sm font-medium text-slate-700">{t.reminderHours}</label>
+              <input className="input-field text-sm" type="number" min={1} max={72} value={telegram.reminderHours} onChange={(event) => setTelegram({ ...telegram, reminderHours: Number(event.target.value) })} />
+              <p className="text-xs text-slate-500">{t.reminderHoursHint}</p>
+              <label className="block text-sm font-medium text-slate-700">{t.botToken}</label>
+              <input className="input-field text-sm" type="password" autoComplete="new-password" placeholder={telegram.tokenSet ? t.tokenSaved : t.botToken} value={telegram.token} onChange={(event) => setTelegram({ ...telegram, token: event.target.value })} />
+              {telegramError && <p className="text-sm text-red-600" role="alert">{telegramError}</p>}
               <div className="flex gap-2">
-                <button className="btn-primary text-xs" type="submit">Save Telegram</button>
+                <button className="btn-primary text-xs" type="submit">{t.saveTelegram}</button>
                 <button
                   className="btn-secondary text-xs"
                   type="button"
                   onClick={async () => {
                     setTelegramError('');
                     try {
-                      await api('/api/settings/telegram-test', { method: 'POST' });
-                      success('Test message sent.');
+                      const result = await api<{ delivered?: boolean }>('/api/settings/telegram-test', { method: 'POST' });
+                      if (result.delivered !== true) {
+                        setTelegramError(t.testFailed);
+                        return;
+                      }
+                      success(t.testSent);
                     } catch (err) {
-                      setTelegramError(err instanceof ApiError ? err.message : 'Test message failed');
+                      setTelegramError(err instanceof ApiError ? err.message : t.testFailed);
                     }
                   }}
                 >
-                  Send test
+                  {t.sendTest}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!DEMO_MODE && (
+            <form
+              className="space-y-3 border-t border-slate-200 pt-4"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setWhatsappError('');
+                try {
+                  await api('/api/settings', {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                      whatsappPhoneNumberId: whatsapp.phoneNumberId,
+                      whatsappBusinessAccountId: whatsapp.businessAccountId,
+                      whatsappTestRecipient: whatsapp.testRecipient,
+                      ...(whatsapp.token ? { whatsappAccessToken: whatsapp.token } : {}),
+                    }),
+                  });
+                  setWhatsapp((current) => ({ ...current, token: '' }));
+                  await refreshData();
+                  success(t.whatsappSaved);
+                } catch (err) {
+                  setWhatsappError(err instanceof ApiError ? err.message : t.whatsappFailed);
+                }
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-slate-900 text-sm">{t.whatsappTitle}</h4>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{t.whatsappComingSoon}</span>
+              </div>
+              <p className="text-sm text-slate-700">{t.whatsappPatientNote}</p>
+              <p className="text-xs text-slate-500">{t.whatsappHelp}</p>
+              <label className="block text-sm font-medium text-slate-700">{t.phoneNumberId}</label>
+              <input className="input-field text-sm" inputMode="numeric" value={whatsapp.phoneNumberId} onChange={(event) => setWhatsapp({ ...whatsapp, phoneNumberId: event.target.value })} />
+              <label className="block text-sm font-medium text-slate-700">{t.businessAccountId}</label>
+              <input className="input-field text-sm" inputMode="numeric" value={whatsapp.businessAccountId} onChange={(event) => setWhatsapp({ ...whatsapp, businessAccountId: event.target.value })} />
+              <label className="block text-sm font-medium text-slate-700">{t.testRecipient}</label>
+              <input className="input-field text-sm" inputMode="numeric" placeholder="201012345678" value={whatsapp.testRecipient} onChange={(event) => setWhatsapp({ ...whatsapp, testRecipient: event.target.value })} />
+              <p className="text-xs text-slate-500">{t.testRecipientHint}</p>
+              <label className="block text-sm font-medium text-slate-700">{t.accessToken}</label>
+              <input className="input-field text-sm" type="password" autoComplete="new-password" placeholder={whatsapp.tokenSet ? t.tokenSaved : t.accessToken} value={whatsapp.token} onChange={(event) => setWhatsapp({ ...whatsapp, token: event.target.value })} />
+              {whatsapp.lastStatus === 'accepted' && <p className="text-xs text-emerald-700">{t.whatsappAccepted}</p>}
+              {whatsapp.lastStatus === 'rejected' && <p className="text-xs text-amber-800">{t.whatsappRejected}</p>}
+              {whatsappError && <p className="text-sm text-red-600" role="alert">{whatsappError}</p>}
+              <div className="flex gap-2">
+                <button className="btn-primary text-xs" type="submit">{t.save}</button>
+                <button
+                  className="btn-secondary text-xs"
+                  type="button"
+                  onClick={async () => {
+                    setWhatsappError('');
+                    try {
+                      const result = await api<{ delivered?: boolean }>('/api/settings/whatsapp-test', { method: 'POST' });
+                      if (result.delivered !== true) {
+                        setWhatsappError(t.whatsappRejected);
+                        return;
+                      }
+                      success(t.whatsappAccepted);
+                      await refreshData();
+                    } catch (err) {
+                      setWhatsappError(err instanceof ApiError ? err.message : t.whatsappRejected);
+                    }
+                  }}
+                >
+                  {t.sendWhatsAppTest}
                 </button>
               </div>
             </form>

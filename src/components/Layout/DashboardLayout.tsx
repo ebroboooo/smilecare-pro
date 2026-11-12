@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
 import { translations } from '../../utils/translations';
+import { statusText } from '../../utils/locale';
+import { LanguageSwitch } from '../ui/LanguageSwitch';
 import { DEFAULT_PUBLIC_BOOKING_SLUG } from '../../types';
 import {
   LayoutDashboard, Calendar, Clock, Users, GitMerge, Briefcase,
@@ -36,7 +38,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     { name: t.services, path: '/admin/services', icon: Briefcase },
     { name: t.employees, path: '/admin/employees', icon: Stethoscope },
     ...(hasPermission('owner') ? [
-      { name: 'Staff accounts', path: '/admin/users', icon: Users },
+      { name: t.staffAccounts, path: '/admin/users', icon: Users },
       { name: t.reports, path: '/admin/reports', icon: BarChart3 },
       { name: t.settings, path: '/admin/settings', icon: Settings },
     ] : [])
@@ -77,10 +79,10 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   return (
-    <div className={`min-h-screen flex flex-col md:flex-row bg-slate-50 ${isRtl ? 'rtl' : 'ltr'}`}>
+    <div className={`min-h-screen flex flex-col md:flex-row bg-slate-50 ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 p-4 shrink-0 z-30">
+      <aside className="hidden md:flex flex-col w-64 bg-white border-e border-slate-200 p-4 shrink-0 z-30">
         <div className="flex items-center gap-2.5 px-2 py-4 mb-4">
           <div className="bg-brand-600 p-2 rounded-xl text-white">
             <Smile className="h-5 w-5" />
@@ -102,7 +104,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
             </div>
             <div className="overflow-hidden">
               <p className="text-xs font-semibold text-slate-900 truncate">{currentUser?.name}</p>
-              <p className="text-[10px] text-slate-400 truncate">{currentUser?.role}</p>
+              <p className="text-[10px] text-slate-400 truncate">{statusText(t, currentUser?.role || '')}</p>
             </div>
           </div>
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium">
@@ -120,7 +122,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
           <span className="font-display font-bold text-slate-900">SmileCare Pro</span>
         </div>
-        <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 text-slate-500" aria-label="Open menu">
+        <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 text-slate-500" aria-label={t.openMenu}>
           <Menu className="h-6 w-6" />
         </button>
       </header>
@@ -128,9 +130,9 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 md:hidden" onClick={() => setMobileMenuOpen(false)}>
-          <div className="w-72 bg-white h-full ml-auto p-4 flex flex-col shadow-elevated animate-slide-up" onClick={e => e.stopPropagation()}>
+          <div className="w-72 bg-white h-full ms-auto p-4 flex flex-col shadow-elevated animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
-              <span className="font-display font-bold text-slate-900">Menu</span>
+              <span className="font-display font-bold text-slate-900">{t.menu}</span>
               <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 text-slate-400"><X className="h-5 w-5" /></button>
             </div>
             <nav className="space-y-0.5 flex-1">
@@ -147,7 +149,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
         <header className="hidden md:flex items-center justify-between px-6 lg:px-8 py-4 bg-white border-b border-slate-200 sticky top-0 z-20">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-slate-900">{t.welcome}, {currentUser?.name}!</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{t.welcome} {currentUser?.name}</h2>
             {currentUser?.role !== 'doctor' && (
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
                 <Building className="h-4 w-4 text-brand-600" />
@@ -166,6 +168,14 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
           </div>
 
           <div className="flex items-center gap-3 relative">
+            {hasPermission('owner') && (
+              <LanguageSwitch
+                lang={lang === 'ar' ? 'ar' : 'en'}
+                onChange={(next) => {
+                  void db.settings.update(currentUser?.orgId || 'clinic', { language: next, isRtl: next === 'ar' }).then(() => refreshData());
+                }}
+              />
+            )}
             <a
               href={`/book/${settings?.publicSlug || DEFAULT_PUBLIC_BOOKING_SLUG}`}
               target="_blank"
@@ -180,7 +190,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
               <button
                 onClick={() => setNotifDropdownOpen(!notifDropdownOpen)}
                 className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-xl transition-all relative"
-                aria-label="Notifications"
+                aria-label={t.notifications}
               >
                 <Bell className="h-5 w-5" />
                 {unreadNotificationCount > 0 && (
@@ -193,12 +203,12 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
               {notifDropdownOpen && (
                 <div className={`absolute top-full mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-elevated p-4 z-50 ${isRtl ? 'left-0' : 'right-0'} animate-slide-down`}>
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-                    <span className="font-semibold text-slate-900 text-sm">Notifications</span>
-                    <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-semibold">Mark all read</button>
+                    <span className="font-semibold text-slate-900 text-sm">{t.notifications}</span>
+                    <button onClick={handleMarkAllRead} className="text-xs text-brand-600 hover:text-brand-700 font-semibold">{t.markAllRead}</button>
                   </div>
                   <div className="max-h-60 overflow-y-auto space-y-2">
                     {notifications.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4">No notifications yet.</p>
+                      <p className="text-xs text-slate-400 text-center py-4">{t.noNotifications}</p>
                     ) : (
                       notifications.map(notif => (
                         <div key={notif.id} className={`p-3 rounded-xl border text-sm ${notif.read ? 'bg-slate-50 border-slate-100 text-slate-500' : 'bg-brand-50/50 border-brand-100 text-slate-700'}`}>

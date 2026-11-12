@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { assertSlotAvailable, canTransition, slotsForDoctor } from '../availability.js';
 import { writeAudit } from '../audit.js';
 import { createPatientLink, queueAppointmentAlert, refreshTelegramBot, sendTelegramTest } from '../telegram.js';
+import { sendWhatsAppTest } from '../whatsapp.js';
 import { newBookingRef, requireAuth, requireRoles } from '../auth.js';
 import { getDb } from '../db.js';
 import { HttpError, asyncHandler, parseId } from '../http.js';
@@ -262,6 +263,13 @@ function mapSettings(row: {
   telegram_bot_token: string | null;
   telegram_chat_id: string | null;
   telegram_enabled: number;
+  telegram_bot_username?: string | null;
+  telegram_reminder_hours?: number | null;
+  whatsapp_phone_number_id?: string | null;
+  whatsapp_access_token?: string | null;
+  whatsapp_business_account_id?: string | null;
+  whatsapp_test_recipient?: string | null;
+  whatsapp_last_status?: string | null;
 }) {
   return {
     orgId: 'clinic',
@@ -289,6 +297,13 @@ function mapSettings(row: {
     telegramChatId: row.telegram_chat_id || '',
     telegramEnabled: row.telegram_enabled === 1,
     telegramTokenSet: Boolean(row.telegram_bot_token),
+    telegramBotUsername: row.telegram_bot_username || '',
+    telegramReminderHours: row.telegram_reminder_hours || 24,
+    whatsappPhoneNumberId: row.whatsapp_phone_number_id || '',
+    whatsappBusinessAccountId: row.whatsapp_business_account_id || '',
+    whatsappTestRecipient: row.whatsapp_test_recipient || '',
+    whatsappTokenSet: Boolean(row.whatsapp_access_token),
+    whatsappLastStatus: row.whatsapp_last_status || '',
   };
 }
 
@@ -1300,6 +1315,12 @@ const settingsPatch = z.object({
   telegramBotToken: z.string().trim().min(20).max(200).optional(),
   telegramChatId: z.string().trim().max(40).optional(),
   telegramEnabled: z.boolean().optional(),
+  telegramBotUsername: z.string().trim().max(33).regex(/^$|^@?[A-Za-z][A-Za-z0-9_]{3,31}$/).optional(),
+  telegramReminderHours: z.number().int().min(1).max(72).optional(),
+  whatsappPhoneNumberId: z.string().trim().max(30).regex(/^$|^\d{5,30}$/).optional(),
+  whatsappAccessToken: z.string().trim().min(20).max(500).optional(),
+  whatsappBusinessAccountId: z.string().trim().max(40).regex(/^$|^\d{5,40}$/).optional(),
+  whatsappTestRecipient: z.string().trim().max(20).regex(/^$|^\d{8,15}$/).optional(),
 });
 
 clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
@@ -1358,6 +1379,24 @@ clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
   if (body.telegramEnabled !== undefined) {
     getDb().prepare('UPDATE settings SET telegram_enabled = ? WHERE id = 1').run(body.telegramEnabled ? 1 : 0);
   }
+  if (body.telegramBotUsername !== undefined) {
+    getDb().prepare('UPDATE settings SET telegram_bot_username = ? WHERE id = 1').run(body.telegramBotUsername.replace(/^@/, ''));
+  }
+  if (body.telegramReminderHours !== undefined) {
+    getDb().prepare('UPDATE settings SET telegram_reminder_hours = ? WHERE id = 1').run(body.telegramReminderHours);
+  }
+  if (body.whatsappPhoneNumberId !== undefined) {
+    getDb().prepare('UPDATE settings SET whatsapp_phone_number_id = ? WHERE id = 1').run(body.whatsappPhoneNumberId);
+  }
+  if (body.whatsappAccessToken) {
+    getDb().prepare('UPDATE settings SET whatsapp_access_token = ? WHERE id = 1').run(body.whatsappAccessToken);
+  }
+  if (body.whatsappBusinessAccountId !== undefined) {
+    getDb().prepare('UPDATE settings SET whatsapp_business_account_id = ? WHERE id = 1').run(body.whatsappBusinessAccountId);
+  }
+  if (body.whatsappTestRecipient !== undefined) {
+    getDb().prepare('UPDATE settings SET whatsapp_test_recipient = ? WHERE id = 1').run(body.whatsappTestRecipient);
+  }
   void refreshTelegramBot();
   writeAudit(req.user!, 'settings_updated', 'Clinic settings updated');
   res.json(readSettings());
@@ -1365,7 +1404,12 @@ clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
 
 clinicRouter.post('/settings/telegram-test', requireRoles('owner'), asyncHandler(async (_req, res) => {
   await sendTelegramTest();
-  res.json({ ok: true });
+  res.json({ delivered: true });
+}));
+
+clinicRouter.post('/settings/whatsapp-test', requireRoles('owner'), asyncHandler(async (_req, res) => {
+  const result = await sendWhatsAppTest();
+  res.json({ delivered: true, providerMessageId: result.providerMessageId });
 }));
 
 clinicRouter.post('/patients/:id/telegram-link', staffWrite, (req, res) => {
@@ -1374,7 +1418,7 @@ clinicRouter.post('/patients/:id/telegram-link', staffWrite, (req, res) => {
   if (!patient) throw new HttpError(404, 'NOT_FOUND', 'Patient not found');
   const link = createPatientLink(id);
   writeAudit(req.user!, 'telegram_link_created', `Created a Telegram link for patient ${id}`);
-  res.status(201).json({ token: link.token, instruction: `Ask the patient to open the clinic bot and send /start ${link.token}` });
+  res.status(201).json({ token: link.token, instruction: link.instruction });
 });
 
 clinicRouter.get('/audit', (_req, res) => {

@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../db/api';
 import type { User, UserRole } from '../../types';
+import { useApp } from '../../context/AppContext';
+import { translations } from '../../utils/translations';
+import { statusText } from '../../utils/locale';
 
 export const UserManagement: React.FC = () => {
+  const { settings } = useApp();
+  const t = translations[settings?.language || 'en'];
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -32,7 +37,7 @@ export const UserManagement: React.FC = () => {
       setForm({ name: '', email: '', password: '', role: 'receptionist' });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the account');
+      setError(err instanceof Error ? err.message : t.couldNotCreateAccount);
     }
   };
 
@@ -45,29 +50,29 @@ export const UserManagement: React.FC = () => {
       });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the account');
+      setError(err instanceof Error ? err.message : t.couldNotUpdateAccount);
     }
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900">Staff accounts</h2>
-        <p className="text-xs text-slate-500">Owners create receptionist and doctor sign-ins. New passwords must be changed at first login.</p>
+        <h2 className="text-xl font-bold text-slate-900">{t.staffAccounts}</h2>
+        <p className="text-sm text-slate-500">{t.staffHelp}</p>
       </div>
 
       {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2" role="alert">{error}</p>}
 
       <form onSubmit={createUser} className="panel p-5 grid gap-3 md:grid-cols-2 max-w-3xl">
-        <input className="input-field" required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input className="input-field" required type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <input className="input-field" required type="password" minLength={10} placeholder="Temporary password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <input className="input-field" required placeholder={t.fullName} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <input className="input-field" required type="email" placeholder={t.email} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <input className="input-field" required type="password" minLength={10} placeholder={t.tempPassword} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         <select className="input-field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
-          <option value="receptionist">Receptionist</option>
-          <option value="doctor">Doctor</option>
-          <option value="owner">Owner</option>
+          <option value="receptionist">{t.roleReception}</option>
+          <option value="doctor">{t.roleDoctor}</option>
+          <option value="owner">{t.roleOwner}</option>
         </select>
-        <button className="btn-primary md:col-span-2" type="submit">Create account</button>
+        <button className="btn-primary md:col-span-2" type="submit">{t.createAccount}</button>
       </form>
 
       <div className="panel divide-y divide-slate-100">
@@ -75,10 +80,10 @@ export const UserManagement: React.FC = () => {
           <div key={user.id} className="flex items-center justify-between gap-3 p-4">
             <div>
               <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-              <p className="text-xs text-slate-500">{user.email} · {user.role}</p>
+              <p className="text-xs text-slate-500">{user.email} · {statusText(t, user.role)}</p>
             </div>
             <button type="button" className="btn-secondary text-xs" onClick={() => toggleActive(user)}>
-              {user.isActive ? 'Deactivate' : 'Activate'}
+              {user.isActive ? t.deactivate : t.activate}
             </button>
           </div>
         ))}

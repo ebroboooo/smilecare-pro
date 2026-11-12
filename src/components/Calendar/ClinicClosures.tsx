@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, ApiError } from '../../db/api';
+import { useApp } from '../../context/AppContext';
+import { translations } from '../../utils/translations';
 import type { Branch, Employee } from '../../types';
 
 interface Holiday {
@@ -18,6 +20,8 @@ interface TimeOff {
 }
 
 export const ClinicClosures: React.FC<{ branches: Branch[]; employees: Employee[] }> = ({ branches, employees }) => {
+  const { settings } = useApp();
+  const t = translations[settings?.language === 'ar' ? 'ar' : 'en'];
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOff[]>([]);
   const [doctorId, setDoctorId] = useState(employees[0]?.id || '');
@@ -73,38 +77,38 @@ export const ClinicClosures: React.FC<{ branches: Branch[]; employees: Employee[
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <form onSubmit={addHoliday} className="panel p-5 space-y-3">
-        <h3 className="font-semibold text-slate-900">Clinic closures</h3>
+        <h3 className="font-semibold text-slate-900">{t.closures}</h3>
         <select className="input-field" value={holiday.branchId} onChange={(event) => setHoliday({ ...holiday, branchId: event.target.value })}>
           {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select>
         <input className="input-field" type="date" required value={holiday.date} onChange={(event) => setHoliday({ ...holiday, date: event.target.value })} />
-        <input className="input-field" required placeholder="Label" value={holiday.label} onChange={(event) => setHoliday({ ...holiday, label: event.target.value })} />
-        <button className="btn-primary text-xs" type="submit">Add closure</button>
+        <input className="input-field" required placeholder={t.closureLabel} value={holiday.label} onChange={(event) => setHoliday({ ...holiday, label: event.target.value })} />
+        <button className="btn-primary text-xs" type="submit">{t.addClosure}</button>
         <ul className="text-sm space-y-2">
-          {holidays.length === 0 && <li className="text-slate-500">No closures yet.</li>}
+          {holidays.length === 0 && <li className="text-slate-500">{t.noClosures}</li>}
           {holidays.map((row) => (
             <li key={row.id} className="flex items-center justify-between gap-3">
               <span>{row.date} · {row.label}</span>
-              <button type="button" className="text-xs text-red-600" onClick={() => api(`/api/holidays/${row.id}`, { method: 'DELETE' }).then(() => load())}>Remove</button>
+              <button type="button" className="text-xs text-red-600" onClick={() => api(`/api/holidays/${row.id}`, { method: 'DELETE' }).then(() => load())}>{t.remove}</button>
             </li>
           ))}
         </ul>
       </form>
       <form onSubmit={addTimeOff} className="panel p-5 space-y-3">
-        <h3 className="font-semibold text-slate-900">Doctor time off</h3>
+        <h3 className="font-semibold text-slate-900">{t.timeOff}</h3>
         <select className="input-field" value={doctorId} onChange={(event) => { setDoctorId(event.target.value); load(event.target.value).catch(() => undefined); }}>
           {employees.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name}</option>)}
         </select>
         <input className="input-field" type="datetime-local" required value={off.startsAt} onChange={(event) => setOff({ ...off, startsAt: event.target.value })} />
         <input className="input-field" type="datetime-local" required value={off.endsAt} onChange={(event) => setOff({ ...off, endsAt: event.target.value })} />
-        <input className="input-field" placeholder="Reason" value={off.reason} onChange={(event) => setOff({ ...off, reason: event.target.value })} />
-        <button className="btn-primary text-xs" type="submit">Add time off</button>
+        <input className="input-field" placeholder={t.timeOffReason} value={off.reason} onChange={(event) => setOff({ ...off, reason: event.target.value })} />
+        <button className="btn-primary text-xs" type="submit">{t.addTimeOff}</button>
         <ul className="text-sm space-y-2">
-          {timeOff.length === 0 && <li className="text-slate-500">No time off for this doctor.</li>}
+          {timeOff.length === 0 && <li className="text-slate-500">{t.noTimeOff}</li>}
           {timeOff.map((row) => (
             <li key={row.id} className="flex items-center justify-between gap-3">
-              <span>{row.startsAt.slice(0, 16).replace('T', ' ')} · {row.reason || 'Time off'}</span>
-              <button type="button" className="text-xs text-red-600" onClick={() => api(`/api/time-off/${row.id}`, { method: 'DELETE' }).then(() => load())}>Remove</button>
+              <span>{row.startsAt.slice(0, 16).replace('T', ' ')} · {row.reason || t.timeOff}</span>
+              <button type="button" className="text-xs text-red-600" onClick={() => api(`/api/time-off/${row.id}`, { method: 'DELETE' }).then(() => load())}>{t.remove}</button>
             </li>
           ))}
         </ul>

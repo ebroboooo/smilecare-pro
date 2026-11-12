@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '../../db/api';
+import { useApp } from '../../context/AppContext';
+import { translations } from '../../utils/translations';
+import { formatMoney, statusText } from '../../utils/locale';
 
 const TEETH = [
   '18', '17', '16', '15', '14', '13', '12', '11',
@@ -25,6 +28,10 @@ interface VisitRow { id: string; visitedOn: string; doctorName: string; complain
 interface PaymentRow { id: string; amount: number; method: string; paidAt: string; note: string }
 
 export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
+  const { settings } = useApp();
+  const lang = settings?.language || 'en';
+  const t = translations[lang];
+  const currency = settings?.currency || 'EGP';
   const [teeth, setTeeth] = useState<Record<string, ToothRow>>({});
   const [selected, setSelected] = useState('11');
   const [visits, setVisits] = useState<VisitRow[]>([]);
@@ -49,7 +56,7 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
   }, [patientId]);
 
   useEffect(() => {
-    load().catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not load the chart'));
+    load().catch((err: unknown) => setError(err instanceof Error ? err.message : t.couldNotLoadChart));
   }, [load]);
 
   const condition = teeth[selected]?.condition || 'Sound';
@@ -63,7 +70,7 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
       });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save the tooth');
+      setError(err instanceof ApiError ? err.message : t.couldNotSaveTooth);
     }
   };
 
@@ -75,7 +82,7 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
       setVisit({ ...visit, complaint: '', diagnosis: '', treatment: '' });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save the visit');
+      setError(err instanceof ApiError ? err.message : t.couldNotSaveVisit);
     }
   };
 
@@ -90,14 +97,14 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
       setPayment({ amount: '', method: 'Cash', note: '' });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not record the payment');
+      setError(err instanceof ApiError ? err.message : t.couldNotRecordPayment);
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="panel p-5 space-y-4">
-        <h3 className="font-semibold text-slate-900">Odontogram</h3>
+        <h3 className="font-semibold text-slate-900">{t.toothChart}</h3>
         <div className="grid grid-cols-8 gap-1 max-w-xl">
           {TEETH.slice(0, 16).map((tooth) => (
             <button key={tooth} type="button" onClick={() => setSelected(tooth)} className={`rounded-lg border px-1 py-2 text-[10px] font-bold ${COLORS[teeth[tooth]?.condition || 'Sound']} ${selected === tooth ? 'ring-2 ring-brand-500' : ''}`}>{tooth}</button>
@@ -108,23 +115,23 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
             <button key={tooth} type="button" onClick={() => setSelected(tooth)} className={`rounded-lg border px-1 py-2 text-[10px] font-bold ${COLORS[teeth[tooth]?.condition || 'Sound']} ${selected === tooth ? 'ring-2 ring-brand-500' : ''}`}>{tooth}</button>
           ))}
         </div>
-        <p className="text-xs text-slate-500">Tooth {selected}: {condition}</p>
+        <p className="text-xs text-slate-500">{t.toothLabel} {selected}: {statusText(t, condition)}</p>
         <div className="flex flex-wrap gap-2">
           {CONDITIONS.map((item) => (
-            <button key={item} type="button" className="btn-secondary text-xs" onClick={() => saveTooth(item)}>{item}</button>
+            <button key={item} type="button" className="btn-secondary text-xs" onClick={() => saveTooth(item)}>{statusText(t, item)}</button>
           ))}
         </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <form onSubmit={saveVisit} className="panel p-5 space-y-3">
-          <h3 className="font-semibold text-slate-900">Visit record</h3>
+          <h3 className="font-semibold text-slate-900">{t.visitRecord}</h3>
           <input className="input-field" type="date" value={visit.visitedOn} onChange={(event) => setVisit({ ...visit, visitedOn: event.target.value })} required />
-          <input className="input-field" placeholder="Complaint" value={visit.complaint} onChange={(event) => setVisit({ ...visit, complaint: event.target.value })} />
-          <input className="input-field" placeholder="Diagnosis" value={visit.diagnosis} onChange={(event) => setVisit({ ...visit, diagnosis: event.target.value })} />
-          <input className="input-field" placeholder="Treatment" value={visit.treatment} onChange={(event) => setVisit({ ...visit, treatment: event.target.value })} />
-          <button className="btn-primary text-xs" type="submit">Save visit</button>
-          {visits.length === 0 && <p className="text-xs text-slate-500">No visits yet.</p>}
+          <input className="input-field" placeholder={t.complaint} value={visit.complaint} onChange={(event) => setVisit({ ...visit, complaint: event.target.value })} />
+          <input className="input-field" placeholder={t.diagnosis} value={visit.diagnosis} onChange={(event) => setVisit({ ...visit, diagnosis: event.target.value })} />
+          <input className="input-field" placeholder={t.treatment} value={visit.treatment} onChange={(event) => setVisit({ ...visit, treatment: event.target.value })} />
+          <button className="btn-primary text-xs" type="submit">{t.saveVisit}</button>
+          {visits.length === 0 && <p className="text-xs text-slate-500">{t.noVisits}</p>}
           <ul className="text-sm space-y-2">
             {visits.map((row) => (
               <li key={row.id} className="border border-slate-100 rounded-xl p-2">
@@ -136,21 +143,21 @@ export const DentalChart: React.FC<{ patientId: string }> = ({ patientId }) => {
         </form>
 
         <form onSubmit={savePayment} className="panel p-5 space-y-3">
-          <h3 className="font-semibold text-slate-900">Payments</h3>
+          <h3 className="font-semibold text-slate-900">{t.payments}</h3>
           {balance && (
-            <p className="text-sm text-slate-700">Charges {balance.charges} · Paid {balance.paid} · Balance {balance.balance}</p>
+            <p className="text-sm text-slate-700">{t.charges} {formatMoney(balance.charges, currency, lang)} · {t.paid} {formatMoney(balance.paid, currency, lang)} · {t.balance} {formatMoney(balance.balance, currency, lang)}</p>
           )}
-          <input className="input-field" type="number" min="0.01" step="0.01" placeholder="Amount" value={payment.amount} onChange={(event) => setPayment({ ...payment, amount: event.target.value })} required />
+          <input className="input-field" type="number" min="0.01" step="0.01" placeholder={t.amount} value={payment.amount} onChange={(event) => setPayment({ ...payment, amount: event.target.value })} required />
           <select className="input-field" value={payment.method} onChange={(event) => setPayment({ ...payment, method: event.target.value as 'Cash' | 'Card' })}>
-            <option value="Cash">Cash</option>
-            <option value="Card">Card</option>
+            <option value="Cash">{t.cash}</option>
+            <option value="Card">{t.card}</option>
           </select>
-          <input className="input-field" placeholder="Note" value={payment.note} onChange={(event) => setPayment({ ...payment, note: event.target.value })} />
-          <button className="btn-primary text-xs" type="submit">Record payment</button>
-          {payments.length === 0 && <p className="text-xs text-slate-500">No payments yet.</p>}
+          <input className="input-field" placeholder={t.paymentNote} value={payment.note} onChange={(event) => setPayment({ ...payment, note: event.target.value })} />
+          <button className="btn-primary text-xs" type="submit">{t.recordPayment}</button>
+          {payments.length === 0 && <p className="text-xs text-slate-500">{t.noPayments}</p>}
           <ul className="text-sm space-y-2">
             {payments.map((row) => (
-              <li key={row.id}>{row.paidAt.slice(0, 10)} · {row.amount} {row.method} {row.note}</li>
+              <li key={row.id}>{row.paidAt.slice(0, 10)} · {formatMoney(row.amount, currency, lang)} {statusText(t, row.method)} {row.note}</li>
             ))}
           </ul>
         </form>

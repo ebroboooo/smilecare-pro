@@ -1,4 +1,6 @@
 import { Component, type ReactNode } from 'react';
+import { translations, type Language } from '../../utils/translations';
+import { readPublicLanguage } from '../../utils/publicLanguage';
 
 interface Props {
   children: ReactNode;
@@ -17,12 +19,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      const lang: Language = readPublicLanguage() ?? (document.documentElement.lang === 'ar' ? 'ar' : 'en');
+      const t = translations[lang];
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
           <div className="panel max-w-md p-8 space-y-3 text-center">
-            <h1 className="text-xl font-bold text-slate-900">Something went wrong</h1>
-            <p className="text-sm text-slate-500">The page hit an unexpected error. Reload and try again. If it continues, contact the clinic administrator.</p>
-            <button type="button" className="btn-primary" onClick={() => window.location.reload()}>Reload</button>
+            <h1 className="text-xl font-bold text-slate-900">{t.somethingWrong}</h1>
+            <p className="text-sm text-slate-600">{t.somethingWrongHelp}</p>
+            <button type="button" className="btn-primary" onClick={() => window.location.reload()}>{t.reload}</button>
           </div>
         </div>
       );

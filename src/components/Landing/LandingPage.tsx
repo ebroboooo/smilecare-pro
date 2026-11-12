@@ -5,6 +5,9 @@ import { api, toQuery } from '../../db/api';
 import { DEMO_MODE } from '../../db';
 import { DEFAULT_PUBLIC_BOOKING_SLUG } from '../../types';
 import { translations, type Language } from '../../utils/translations';
+import { formatMoney } from '../../utils/locale';
+import { applyDocumentLanguage, readPublicLanguage, writePublicLanguage } from '../../utils/publicLanguage';
+import { LanguageSwitch } from '../ui/LanguageSwitch';
 
 interface PublicClinic {
   businessName: string;
@@ -33,7 +36,7 @@ interface PublicDoctor {
 }
 
 export const LandingPage: React.FC = () => {
-  const [lang, setLang] = useState<Language>('en');
+  const [lang, setLang] = useState<Language>(() => readPublicLanguage() ?? 'en');
   const [menuOpen, setMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [clinic, setClinic] = useState<PublicClinic | null>(null);
@@ -47,16 +50,20 @@ export const LandingPage: React.FC = () => {
   const bookable = clinic?.publicBookingEnabled !== false;
 
   useEffect(() => {
-    document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
-    document.documentElement.setAttribute('lang', lang);
+    applyDocumentLanguage(lang);
   }, [lang]);
+
+  const chooseLang = (next: Language) => {
+    writePublicLanguage(next);
+    setLang(next);
+  };
 
   useEffect(() => {
     if (DEMO_MODE) return;
     api<PublicClinic>('/api/public/clinic')
       .then((data) => {
         setClinic(data);
-        setLang(data.language === 'ar' ? 'ar' : 'en');
+        if (!readPublicLanguage()) setLang(data.language === 'ar' ? 'ar' : 'en');
         const branchId = data.branches[0] ? String(data.branches[0].id) : '';
         if (!branchId) return;
         api<PublicService[]>(`/api/public/services${toQuery({ branchId })}`).then(setServices).catch(() => setServices([]));
@@ -76,7 +83,7 @@ export const LandingPage: React.FC = () => {
     event.preventDefault();
     setSendError('');
     if (DEMO_MODE) {
-      setSendError('Demo mode does not send inquiries to a clinic.');
+      setSendError(copy.demoNoInquiry);
       return;
     }
     try {
@@ -89,7 +96,7 @@ export const LandingPage: React.FC = () => {
       });
       setSent(true);
     } catch (error) {
-      setSendError(error instanceof Error ? error.message : 'Could not send');
+      setSendError(error instanceof Error ? error.message : copy.couldNotSend);
     }
   };
 
@@ -105,17 +112,18 @@ export const LandingPage: React.FC = () => {
             {nav.map((link) => <a key={link.href} href={link.href} className="text-sm font-medium text-slate-600 hover:text-brand-600">{link.label}</a>)}
           </div>
           <div className="hidden md:flex items-center gap-3">
-            <button type="button" className="btn-ghost text-sm" onClick={() => setLang(lang === 'en' ? 'ar' : 'en')}>{lang === 'en' ? 'العربية' : 'English'}</button>
+            <LanguageSwitch lang={lang} onChange={chooseLang} />
             <Link to="/login" className="btn-ghost text-sm">{copy.landingLogin}</Link>
             {bookable ? <Link to={`/book/${slug}`} className="btn-primary text-sm py-2 px-5">{copy.landingBook}</Link> : <a href="#contact" className="btn-primary text-sm py-2 px-5">{copy.landingCall}</a>}
           </div>
-          <button className="md:hidden p-2" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
+          <button className="md:hidden p-2" onClick={() => setMenuOpen(!menuOpen)} aria-label={copy.openMenu}>
             {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
         {menuOpen && (
           <div className="md:hidden bg-white border-t border-slate-100 px-4 py-4 space-y-3">
             {nav.map((link) => <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} className="block text-sm font-medium text-slate-600 py-2">{link.label}</a>)}
+            <LanguageSwitch lang={lang} onChange={chooseLang} />
             <Link to="/login" className="btn-secondary text-sm w-full">{copy.landingLogin}</Link>
           </div>
         )}
@@ -142,14 +150,14 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-display font-bold text-slate-900 mb-8">{copy.landingServices}</h2>
           {services.length === 0 ? (
-            <p className="text-sm text-slate-500">{copy.landingCall}</p>
+            <p className="text-sm text-slate-500">{copy.noServicesYet}</p>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {services.map((service) => (
                 <div key={service.id} className="card p-6">
                   <h3 className="font-semibold text-slate-900">{service.name}</h3>
                   <p className="text-sm text-slate-600 mt-2">{service.description}</p>
-                  <p className="text-sm font-semibold text-brand-700 mt-4">{service.price} {clinic?.currency} · {service.duration} min</p>
+                  <p className="text-sm font-semibold text-brand-700 mt-4">{formatMoney(service.price, clinic?.currency || 'EGP', lang)} · {service.duration} {copy.minutesShort}</p>
                 </div>
               ))}
             </div>
@@ -161,7 +169,7 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-display font-bold text-slate-900 mb-8">{copy.landingDoctors}</h2>
           {doctors.length === 0 ? (
-            <p className="text-sm text-slate-500">{copy.landingCall}</p>
+            <p className="text-sm text-slate-500">{copy.noDoctorsYet}</p>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {doctors.map((doctor) => (
@@ -206,7 +214,7 @@ export const LandingPage: React.FC = () => {
             ))}
             {clinic?.phone && <p className="flex items-center gap-2 text-sm text-slate-700"><Phone className="h-4 w-4 text-brand-600" /> {clinic.phone}</p>}
             {clinic?.email && <p className="flex items-center gap-2 text-sm text-slate-700"><Mail className="h-4 w-4 text-brand-600" /> {clinic.email}</p>}
-            <Link to="/privacy" className="text-sm text-brand-700 underline">Privacy</Link>
+            <Link to="/privacy" className="text-sm text-brand-700 underline">{copy.privacy}</Link>
             <p className="text-sm text-slate-600">{copy.landingPay}</p>
           </div>
           <form onSubmit={sendLead} className="card p-8 space-y-4">

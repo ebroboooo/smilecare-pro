@@ -3,9 +3,12 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
 import { CLINIC_ID, type Service } from '../../types';
 import { Plus, Edit3, Trash2, DollarSign, Clock } from 'lucide-react';
+import { translations } from '../../utils/translations';
 
 export const ServicesManagement: React.FC = () => {
   const { services, branches, refreshData, dispatchAuditLog, settings } = useApp();
+  const lang = settings?.language || 'en';
+  const t = translations[lang];
   
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,7 +22,7 @@ export const ServicesManagement: React.FC = () => {
     selectedBranches: [] as string[]
   });
 
-  const currency = settings?.currency || 'USD';
+  const currency = settings?.currency || 'EGP';
 
   const handleOpenCreate = () => {
     setFormData({
@@ -84,7 +87,7 @@ export const ServicesManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to remove the service: ${name}?`)) {
+    if (window.confirm(t.deleteServiceConfirm)) {
       const org = CLINIC_ID;
       await db.services.delete(org, id);
       await dispatchAuditLog("Service Deleted", `Removed service: ${name}`);
@@ -97,8 +100,8 @@ export const ServicesManagement: React.FC = () => {
       
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Services Catalog</h2>
-          <p className="text-xs text-slate-500">Configure bookable services, default prices, and durations</p>
+          <h2 className="text-xl font-bold text-slate-900">{t.servicesTitle}</h2>
+          <p className="text-sm text-slate-500">{t.servicesHelp}</p>
         </div>
         
         <button 
@@ -106,7 +109,7 @@ export const ServicesManagement: React.FC = () => {
           className="btn-primary px-3 py-2 text-xs flex items-center gap-1.5"
         >
           <Plus className="h-4 w-4" />
-          <span>Add Dental Service</span>
+          <span>{t.addService}</span>
         </button>
       </div>
 

@@ -201,4 +201,11 @@ export interface SystemSettings {
   telegramChatId?: string;
   telegramEnabled?: boolean;
   telegramTokenSet?: boolean;
+  telegramBotUsername?: string;
+  telegramReminderHours?: number;
+  whatsappPhoneNumberId?: string;
+  whatsappBusinessAccountId?: string;
+  whatsappTestRecipient?: string;
+  whatsappTokenSet?: boolean;
+  whatsappLastStatus?: string;
 }
