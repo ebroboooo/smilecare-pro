@@ -22,8 +22,18 @@ export type CreateNotificationInput = Omit<Notification, 'id' | 'orgId' | 'creat
 export type CreateWaitlistInput = Omit<WaitlistRecord, 'id' | 'orgId' | 'createdAt'>;
 export type CreateAuditLogInput = Omit<AuditLog, 'id' | 'orgId' | 'timestamp'>;
 
+export interface ListQuery {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  branchId?: string;
+  start?: string;
+  end?: string;
+}
+
 export interface IRepository<T, TCreate = Omit<T, 'id'>> {
-  getAll(orgId: string): Promise<T[]>;
+  getAll(orgId: string, query?: ListQuery): Promise<T[]>;
   getById(orgId: string, id: string): Promise<T | null>;
   create(orgId: string, data: TCreate): Promise<T>;
   update(orgId: string, id: string, data: Partial<T>): Promise<T>;

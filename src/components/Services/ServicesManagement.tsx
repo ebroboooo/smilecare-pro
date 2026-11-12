@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
-import type { Service } from '../../types';
+import { CLINIC_ID, type Service } from '../../types';
 import { Plus, Edit3, Trash2, DollarSign, Clock } from 'lucide-react';
 
 export const ServicesManagement: React.FC = () => {
@@ -60,7 +60,7 @@ export const ServicesManagement: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const payload = {
       name: formData.name,
       description: formData.description,
@@ -85,7 +85,7 @@ export const ServicesManagement: React.FC = () => {
 
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to remove the service: ${name}?`)) {
-      const org = "org-smilecare-pro";
+      const org = CLINIC_ID;
       await db.services.delete(org, id);
       await dispatchAuditLog("Service Deleted", `Removed service: ${name}`);
       await refreshData();

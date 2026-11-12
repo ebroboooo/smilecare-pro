@@ -2,7 +2,7 @@ import type {
   Branch, Customer, Service, Employee, EmployeeSchedule, Reservation, 
   Lead, Notification, WaitlistRecord, SystemSettings, AuditLog 
 } from '../types';
-import { DEFAULT_PUBLIC_BOOKING_SLUG } from '../types';
+import { CLINIC_ID, DEFAULT_PUBLIC_BOOKING_SLUG } from '../types';
 import type { 
   ICustomerRepository,
   IReservationRepository,
@@ -29,7 +29,7 @@ import type {
 const uuid = () => Math.random().toString(36).substring(2, 9);
 
 // Default seed structures
-const DEFAULT_ORG_ID = "org-smilecare-pro";
+const DEFAULT_ORG_ID = CLINIC_ID;
 
 // Standard preset data generator
 export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
@@ -77,7 +77,7 @@ export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
     { 
       id: "res-1", orgId, branchId: "br-main", customerId: "cust-1", serviceId: "srv-1", employeeId: "emp-1", 
       date: todayStr, time: "10:00", duration: services[0].duration, notes: "Six-month checkup. Mild dental anxiety — allow extra time.", status: "Confirmed", 
-      paymentStatus: "Paid", paymentDetails: { method: "Stripe", amount: services[0].price, transactionId: "txn_str_123", paidAt: new Date().toISOString() }, 
+      paymentStatus: "Paid", paymentDetails: { method: "Card", amount: services[0].price, paidAt: new Date().toISOString() }, 
       createdAt: new Date().toISOString() 
     },
     { 
@@ -89,7 +89,7 @@ export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
     { 
       id: "res-3", orgId, branchId: "br-sub", customerId: "cust-3", serviceId: "srv-1", employeeId: "emp-1", 
       date: todayStr, time: "11:30", duration: services[0].duration, notes: "Orthodontic follow-up after cleaning.", status: "Confirmed", 
-      paymentStatus: "Authorized", paymentDetails: { method: "PayPal", amount: services[0].price, transactionId: "txn_pay_abc" }, 
+      paymentStatus: "Unpaid", paymentDetails: { method: "Cash", amount: services[0].price }, 
       createdAt: new Date().toISOString() 
     }
   ];
@@ -123,14 +123,18 @@ export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
     currency: 'USD',
     language: "en",
     isRtl: false,
+    timezone: 'Africa/Cairo',
     activePreset: 'Dental',
+    bookingRules: {
+      minNoticeMinutes: 60,
+      maxDaysAhead: 90,
+      cancelWindowHours: 24,
+      slotIntervalMinutes: 30,
+    },
     features: {
-      stripeEnabled: true,
-      paypalEnabled: true,
       waitlistEnabled: true,
-      googleCalendarEnabled: true,
-      whatsappNotifications: true,
-      telegramNotifications: false
+      telegramNotifications: false,
+      publicBookingEnabled: true,
     }
   };
 
@@ -163,13 +167,17 @@ export const getEmptySeeds = (orgId: string = DEFAULT_ORG_ID) => {
     currency: "USD",
     language: "en",
     isRtl: false,
+    timezone: 'Africa/Cairo',
+    bookingRules: {
+      minNoticeMinutes: 60,
+      maxDaysAhead: 90,
+      cancelWindowHours: 24,
+      slotIntervalMinutes: 30,
+    },
     features: {
-      stripeEnabled: false,
-      paypalEnabled: false,
       waitlistEnabled: true,
-      googleCalendarEnabled: false,
-      whatsappNotifications: false,
-      telegramNotifications: false
+      telegramNotifications: false,
+      publicBookingEnabled: true,
     }
   };
 

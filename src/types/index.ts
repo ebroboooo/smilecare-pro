@@ -1,4 +1,6 @@
-export type UserRole = 'SuperAdmin' | 'BusinessOwner' | 'Employee' | 'Receptionist';
+export const CLINIC_ID = 'clinic';
+
+export type UserRole = 'owner' | 'receptionist' | 'doctor';
 
 export interface User {
   id: string;
@@ -6,8 +8,10 @@ export interface User {
   email: string;
   role: UserRole;
   name: string;
-  branchId?: string | null; // Null means global admin / accesses all branches
+  branchId?: string | null;
+  doctorId?: string | null;
   isActive: boolean;
+  mustChangePassword?: boolean;
 }
 
 export interface Organization {
@@ -47,7 +51,7 @@ export type ReservationStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Cancell
 export type PaymentStatus = 'Unpaid' | 'Authorized' | 'Paid' | 'Refunded';
 
 export interface PaymentDetails {
-  method: 'Stripe' | 'PayPal' | 'Cash' | 'Card';
+  method: 'Cash' | 'Card';
   transactionId?: string;
   amount: number;
   paidAt?: string;
@@ -67,6 +71,7 @@ export interface Reservation {
   status: ReservationStatus;
   paymentStatus: PaymentStatus;
   paymentDetails?: PaymentDetails;
+  bookingRef?: string;
   createdAt: string;
 }
 
@@ -167,6 +172,13 @@ export interface AuditLog {
 
 export const DEFAULT_PUBLIC_BOOKING_SLUG = 'smilecare-clinic';
 
+export interface BookingRules {
+  minNoticeMinutes: number;
+  maxDaysAhead: number;
+  cancelWindowHours: number;
+  slotIntervalMinutes: number;
+}
+
 export interface SystemSettings {
   orgId: string;
   businessName: string;
@@ -175,17 +187,15 @@ export interface SystemSettings {
   address: string;
   phone: string;
   email: string;
-  currency: string; // e.g., USD, AED, SAR, EGP
+  currency: string;
   language: 'en' | 'ar';
   isRtl: boolean;
+  timezone: string;
   activePreset?: 'Dental';
-  // Enabled modules
+  bookingRules: BookingRules;
   features: {
-    stripeEnabled: boolean;
-    paypalEnabled: boolean;
     waitlistEnabled: boolean;
-    googleCalendarEnabled: boolean;
-    whatsappNotifications: boolean;
     telegramNotifications: boolean;
+    publicBookingEnabled: boolean;
   };
 }

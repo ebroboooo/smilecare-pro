@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
+import { CLINIC_ID } from '../../types';
 import { translations } from '../../utils/translations';
 import { 
   Phone, 
@@ -42,7 +43,7 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
     e.preventDefault();
     if (!newNote.trim()) return;
 
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const updatedNotes = customer.notes 
       ? `${customer.notes}\n\n[${new Date().toLocaleDateString()}] ${newNote}`
       : `[${new Date().toLocaleDateString()}] ${newNote}`;

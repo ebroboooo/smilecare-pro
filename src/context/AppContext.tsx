@@ -5,6 +5,8 @@ import type {
 } from '../types';
 import { db } from '../db';
 import { useAuth } from './AuthContext';
+import { CLINIC_ID } from '../types';
+import { DEMO_MODE } from '../db';
 import { mockDbInstance } from '../db/mockRepository';
 
 interface AppContextType {
@@ -46,10 +48,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(true);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
-  const orgId = currentUser?.orgId || "org-smilecare-pro";
+  const orgId = currentUser?.orgId || CLINIC_ID;
 
   const refreshData = useCallback(async () => {
-    const org = currentUser?.orgId || "org-smilecare-pro";
+    if (!currentUser && !DEMO_MODE) {
+      setIsLoading(false);
+      return;
+    }
+    const org = currentUser?.orgId || CLINIC_ID;
     try {
       const [
         bList, cList, sList, eList, rList, lList, nList, wList, setts, logs, unread
@@ -111,6 +117,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const seedBusinessPreset = async () => {
+    if (!DEMO_MODE) return;
     setIsLoading(true);
     mockDbInstance.resetPreset('Dental');
 
@@ -120,6 +127,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetEmptyWorkspace = async () => {
+    if (!DEMO_MODE) return;
     setIsLoading(true);
     mockDbInstance.resetEmpty();
     await db.settings.update(orgId, { activePreset: undefined });

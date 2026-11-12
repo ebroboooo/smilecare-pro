@@ -2,16 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
+import { CLINIC_ID } from '../../types';
+import { DEMO_MODE } from '../../db';
 import { mockDbInstance } from '../../db/mockRepository';
 import { BusinessNotFound } from './BusinessNotFound';
-import { StripeAdapter, PayPalAdapter } from '../../utils/adapters';
 import {
   getAvailableSlots, validateBookingForm, isPastDate, type BookingFormErrors
 } from '../../utils/bookingValidation';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import {
   Building, Briefcase, Stethoscope, Calendar as CalIcon,
-  CreditCard, Smile, CheckCircle, Clock, ArrowRight, ArrowLeft
+  Smile, CheckCircle, Clock, ArrowRight, ArrowLeft
 } from 'lucide-react';
 
 export const BookingPortal: React.FC = () => {
@@ -28,7 +29,6 @@ export const BookingPortal: React.FC = () => {
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientNotes, setClientNotes] = useState('');
-  const [payMethod, setPayMethod] = useState<'Stripe' | 'PayPal' | 'Cash'>('Cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState('');
   const [errors, setErrors] = useState<BookingFormErrors>({});
@@ -76,7 +76,8 @@ export const BookingPortal: React.FC = () => {
     );
   }
 
-  if (!slug || !mockDbInstance.isValidPublicBookingSlug(slug)) {
+  const slugOk = DEMO_MODE ? mockDbInstance.isValidPublicBookingSlug(slug || '') : settings?.publicSlug === slug;
+  if (!slug || !slugOk) {
     return <BusinessNotFound slug={slug} />;
   }
 
@@ -106,22 +107,13 @@ export const BookingPortal: React.FC = () => {
     if (!validateStep2()) return;
 
     setIsProcessing(true);
-    const org = 'org-smilecare-pro';
+    const org = CLINIC_ID;
 
     const hasConflict = await db.reservations.checkConflict(org, selBranch, selEmployee, selDate, selTime, activeService?.duration || 30);
     if (hasConflict) {
       setErrors({ time: 'This time slot was just booked. Please select another.' });
       setIsProcessing(false);
       return;
-    }
-
-    let txnId = '';
-    if (payMethod === 'Stripe') {
-      const res = await new StripeAdapter().processPayment(activeService?.price || 0, activeService?.name || 'Appointment');
-      if (res.success) txnId = res.transactionId || '';
-    } else if (payMethod === 'PayPal') {
-      const res = await new PayPalAdapter().processPayment(activeService?.price || 0, activeService?.name || 'Appointment');
-      if (res.success) txnId = res.transactionId || '';
     }
 
     const patient = await db.customers.create(org, {
@@ -133,12 +125,10 @@ export const BookingPortal: React.FC = () => {
       branchId: selBranch, customerId: patient.id, serviceId: selService, employeeId: selEmployee,
       date: selDate, time: selTime, duration: activeService?.duration || 30, notes: clientNotes,
       status: 'Pending',
-      paymentStatus: payMethod === 'Cash' ? 'Unpaid' : 'Paid',
+      paymentStatus: 'Unpaid',
       paymentDetails: {
-        method: payMethod === 'Cash' ? 'Cash' : payMethod,
+        method: 'Cash',
         amount: activeService?.price || 0,
-        transactionId: txnId || undefined,
-        paidAt: payMethod === 'Cash' ? undefined : new Date().toISOString()
       }
     });
 
@@ -303,19 +293,7 @@ export const BookingPortal: React.FC = () => {
                 <div className="flex justify-between border-t border-slate-200 pt-2 font-bold"><span>Total</span><span className="text-brand-700">${activeService?.price} {currency}</span></div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-2">Payment Method</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {(['Cash', 'Stripe', 'PayPal'] as const).map(method => (
-                    <button key={method} type="button" onClick={() => setPayMethod(method)}
-                      className={`p-3 rounded-xl border text-xs font-semibold transition-all ${
-                        payMethod === method ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}>
-                      {method === 'Cash' ? 'Pay at Clinic' : method === 'Stripe' ? <><CreditCard className="h-4 w-4 mx-auto mb-1" />Card</> : 'PayPal'}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-xl p-3">Payment is collected at the clinic.</p>
 
               <div className="flex gap-3">
                 <button type="button" onClick={() => setStep(2)} className="btn-secondary flex-1">Back</button>
@@ -340,7 +318,7 @@ export const BookingPortal: React.FC = () => {
                 <div className="flex justify-between"><span className="text-slate-500">Clinic</span><span>{activeBranch?.name}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Date & Time</span><span className="font-semibold text-brand-700">{selDate} at {selTime}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Doctor</span><span>{activeEmployee?.name}</span></div>
-                <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Payment</span><span className="font-semibold text-emerald-600">{payMethod === 'Cash' ? 'Pay at Clinic' : 'Paid Online'}</span></div>
+                <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Payment</span><span className="font-semibold text-emerald-600">Pay at Clinic</span></div>
               </div>
               <button onClick={() => { setStep(1); setErrors({}); }} className="btn-secondary">Book Another Appointment</button>
             </div>

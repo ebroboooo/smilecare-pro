@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { translations } from '../../utils/translations';
 import { db } from '../../db';
-import type { Reservation, ReservationStatus, PaymentStatus } from '../../types';
+import { CLINIC_ID, type Reservation, type ReservationStatus, type PaymentStatus } from '../../types';
 import { EnterpriseNotificationHub } from '../../utils/adapters';
 import { 
   ChevronLeft, 
@@ -50,7 +50,7 @@ export const SmartCalendar: React.FC = () => {
     notes: '',
     status: 'Pending' as ReservationStatus,
     paymentStatus: 'Unpaid' as PaymentStatus,
-    paymentMethod: 'Cash' as 'Stripe' | 'PayPal' | 'Cash' | 'Card',
+    paymentMethod: 'Cash' as 'Cash' | 'Card',
     paymentAmount: 0
   });
 
@@ -128,7 +128,7 @@ export const SmartCalendar: React.FC = () => {
   const checkConflict = async (employeeId: string, date: string, time: string, duration: number, excludeId?: string) => {
     const branch = selectedBranchId === 'all' ? (branches[0]?.id || '') : selectedBranchId;
     const hasOverlap = await db.reservations.checkConflict(
-      "org-smilecare-pro",
+      CLINIC_ID,
       branch,
       employeeId,
       date,
@@ -173,7 +173,7 @@ export const SmartCalendar: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const payload = {
       branchId: formData.branchId,
       customerId: formData.customerId,
@@ -225,7 +225,7 @@ export const SmartCalendar: React.FC = () => {
   const handleDelete = async () => {
     if (!formData.id) return;
     if (window.confirm("Are you sure you want to cancel and delete this reservation?")) {
-      const org = "org-smilecare-pro";
+      const org = CLINIC_ID;
       // Promote from waitlist if applicable
       const matchingWaitlist = waitlist.find(w => 
         w.status === 'Waiting' && w.date === formData.date && w.branchId === formData.branchId
@@ -252,7 +252,7 @@ export const SmartCalendar: React.FC = () => {
 
   const handleDuplicate = async () => {
     if (!selectedRes) return;
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const { id: _id, createdAt: _createdAt, orgId: _orgId, ...cleanPayload } = selectedRes;
     await db.reservations.create(org, {
       ...cleanPayload,

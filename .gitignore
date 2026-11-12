@@ -9,6 +9,13 @@ lerna-debug.log*
 
 node_modules
 dist
+server/data
+data
+.env
+server/.env
+*.db
+*.db-shm
+*.db-wal
 dist-ssr
 *.local
 

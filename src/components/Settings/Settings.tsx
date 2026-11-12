@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { db } from '../../db';
+import { CLINIC_ID } from '../../types';
+import { DEMO_MODE } from '../../db';
 import { translations } from '../../utils/translations';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import {
@@ -60,7 +62,7 @@ export const Settings: React.FC = () => {
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     await db.settings.update(org, {
       ...profileData,
       isRtl: profileData.language === 'ar'
@@ -72,12 +74,12 @@ export const Settings: React.FC = () => {
   };
 
   // Toggle individual integration features
-  const handleToggleFeature = async (featureKey: string) => {
+  const handleToggleFeature = async (featureKey: 'waitlistEnabled') => {
     if (!settings) return;
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const updatedFeatures = {
       ...settings.features,
-      [featureKey]: !((settings.features as any)[featureKey])
+      [featureKey]: !settings.features[featureKey],
     };
 
     await db.settings.update(org, { features: updatedFeatures });
@@ -202,7 +204,14 @@ export const Settings: React.FC = () => {
       )}
 
       {/* 2. Preset Layout Seeder presets */}
-      {activeSubTab === 'preset' && (
+      {activeSubTab === 'preset' && !DEMO_MODE && (
+        <div className="panel p-6 max-w-xl space-y-2">
+          <h4 className="font-bold text-slate-900 text-sm">Clinic data</h4>
+          <p className="text-xs text-slate-500">Sample patients and appointments can be loaded with <span className="font-mono">npm run seed:demo</span> before the first owner signs in. This screen does not erase clinic records.</p>
+        </div>
+      )}
+
+      {activeSubTab === 'preset' && DEMO_MODE && (
         <div className="space-y-6">
           <div className="max-w-xl">
             <h4 className="text-slate-900 font-bold text-sm">{t.presetSeeding}</h4>
@@ -247,69 +256,24 @@ export const Settings: React.FC = () => {
       {activeSubTab === 'modules' && (
         <div className="card p-6 rounded-2xl border-slate-200 max-w-xl space-y-5">
           <div>
-            <h4 className="font-bold text-slate-900 text-sm">Enterprise System Integrations</h4>
-            <p className="text-[10px] text-slate-500">Toggle SaaS connectors and sync adapters</p>
+            <h4 className="font-bold text-slate-900 text-sm">Clinic options</h4>
+            <p className="text-[10px] text-slate-500">Payments are collected at the clinic. Online card gateways are not enabled.</p>
           </div>
 
           {settings && (
-            <div className="divide-y divide-slate-850 space-y-4">
-              
-              {/* Stripe */}
-              <div className="flex items-center justify-between py-2 pt-0">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className="text-xs font-bold text-slate-900">{t.stripePayments}</p>
-                  <p className="text-[10px] text-slate-400">Accept credit card deposits upon public scheduling checkout</p>
+                  <p className="text-xs font-bold text-slate-900">Waitlist</p>
+                  <p className="text-[10px] text-slate-400">Allow staff to keep patients waiting for an open slot</p>
                 </div>
-                <button onClick={() => handleToggleFeature('stripeEnabled')}>
-                  {settings.features.stripeEnabled 
+                <button type="button" onClick={() => handleToggleFeature('waitlistEnabled')}>
+                  {settings.features.waitlistEnabled
                     ? <ToggleRight className="h-9 w-9 text-brand-600" />
-                    : <ToggleLeft className="h-9 w-9 text-slate-650" />
+                    : <ToggleLeft className="h-9 w-9 text-slate-400" />
                   }
                 </button>
               </div>
-
-              {/* PayPal */}
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-900">{t.paypalPayments}</p>
-                  <p className="text-[10px] text-slate-400">Enable PayPal wallet Checkout support</p>
-                </div>
-                <button onClick={() => handleToggleFeature('paypalEnabled')}>
-                  {settings.features.paypalEnabled 
-                    ? <ToggleRight className="h-9 w-9 text-brand-600" />
-                    : <ToggleLeft className="h-9 w-9 text-slate-650" />
-                  }
-                </button>
-              </div>
-
-              {/* Google Calendar */}
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-900">{t.googleCalendar}</p>
-                  <p className="text-[10px] text-slate-400">Synchronize appointment schedules directly to staff Google calendars</p>
-                </div>
-                <button onClick={() => handleToggleFeature('googleCalendarEnabled')}>
-                  {settings.features.googleCalendarEnabled 
-                    ? <ToggleRight className="h-9 w-9 text-brand-600" />
-                    : <ToggleLeft className="h-9 w-9 text-slate-650" />
-                  }
-                </button>
-              </div>
-
-              {/* WhatsApp notifications */}
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-900">{t.whatsappAlerts}</p>
-                  <p className="text-[10px] text-slate-400">Dispatch automated reminders to patients on confirmation or rescheduling</p>
-                </div>
-                <button onClick={() => handleToggleFeature('whatsappNotifications')}>
-                  {settings.features.whatsappNotifications 
-                    ? <ToggleRight className="h-9 w-9 text-brand-600" />
-                    : <ToggleLeft className="h-9 w-9 text-slate-650" />
-                  }
-                </button>
-              </div>
-
             </div>
           )}
         </div>

@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
 import { Clock, Plus, Trash2, ArrowUpRight } from 'lucide-react';
-import type { WaitlistRecord } from '../../types';
+import { CLINIC_ID, type WaitlistRecord } from '../../types';
 
 export const WaitlistQueue: React.FC = () => {
-  const { waitlist, customers, services, employees, branches, refreshData, dispatchAuditLog, selectedBranchId } = useApp();
+  const { waitlist, customers, services, employees, branches, refreshData, dispatchAuditLog, selectedBranchId, settings } = useApp();
   
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -25,7 +25,7 @@ export const WaitlistQueue: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     await db.waitlist.create(org, {
       branchId: formData.branchId,
       customerId: formData.customerId,
@@ -43,7 +43,7 @@ export const WaitlistQueue: React.FC = () => {
   };
 
   const handlePromote = async (item: WaitlistRecord) => {
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const selectedSrv = services.find(s => s.id === item.serviceId);
     
     const res = await db.reservations.create(org, {
@@ -71,12 +71,21 @@ export const WaitlistQueue: React.FC = () => {
 
   const handleCancel = async (id: string) => {
     if (window.confirm("Remove this customer from the waitlist?")) {
-      const org = "org-smilecare-pro";
+      const org = CLINIC_ID;
       await db.waitlist.update(org, id, { status: 'Cancelled' });
       await dispatchAuditLog("Waitlist Cancelled", `Cancelled waitlist entry ID ${id}`);
       await refreshData();
     }
   };
+
+  if (settings?.features?.waitlistEnabled === false) {
+    return (
+      <div className="panel p-6">
+        <h2 className="text-xl font-bold text-slate-900">Waitlist</h2>
+        <p className="text-sm text-slate-500 mt-2">The waitlist is turned off in clinic settings.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

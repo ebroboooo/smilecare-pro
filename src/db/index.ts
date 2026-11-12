@@ -1,43 +1,41 @@
-import type { 
-  ICustomerRepository,
-  IReservationRepository,
-  IServiceRepository,
-  IEmployeeRepository,
+import type {
+  IAuditLogRepository,
   IBranchRepository,
+  ICustomerRepository,
+  IEmployeeRepository,
   ILeadRepository,
   INotificationRepository,
+  IReservationRepository,
+  IServiceRepository,
+  ISettingsRepository,
   IWaitlistRepository,
-  IAuditLogRepository,
-  ISettingsRepository
 } from './interfaces';
-import { 
-  MockCustomerRepository,
-  MockReservationRepository,
-  MockServiceRepository,
-  MockEmployeeRepository,
+import {
+  ApiAuditLogRepository,
+  ApiBranchRepository,
+  ApiCustomerRepository,
+  ApiEmployeeRepository,
+  ApiLeadRepository,
+  ApiNotificationRepository,
+  ApiReservationRepository,
+  ApiServiceRepository,
+  ApiSettingsRepository,
+  ApiWaitlistRepository,
+} from './apiRepository';
+import {
+  MockAuditLogRepository,
   MockBranchRepository,
+  MockCustomerRepository,
+  MockEmployeeRepository,
   MockLeadRepository,
   MockNotificationRepository,
+  MockReservationRepository,
+  MockServiceRepository,
+  MockSettingsRepository,
   MockWaitlistRepository,
-  MockAuditLogRepository,
-  MockSettingsRepository
 } from './mockRepository';
-import { 
-  FirestoreCustomerRepository,
-  FirestoreReservationRepository,
-  FirestoreServiceRepository,
-  FirestoreEmployeeRepository,
-  FirestoreBranchRepository,
-  FirestoreLeadRepository,
-  FirestoreNotificationRepository,
-  FirestoreWaitlistRepository,
-  FirestoreAuditLogRepository,
-  FirestoreSettingsRepository
-} from './firestoreRepository';
 
-// Switch Repository source based on env key.
-// Default to Mock for zero-configuration startup.
-const useFirestore = import.meta.env.VITE_USE_FIRESTORE === 'true';
+export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 class RepositoryProvider {
   public branches: IBranchRepository;
@@ -52,18 +50,7 @@ class RepositoryProvider {
   public settings: ISettingsRepository;
 
   constructor() {
-    if (useFirestore) {
-      this.branches = new FirestoreBranchRepository();
-      this.customers = new FirestoreCustomerRepository();
-      this.reservations = new FirestoreReservationRepository();
-      this.services = new FirestoreServiceRepository();
-      this.employees = new FirestoreEmployeeRepository();
-      this.leads = new FirestoreLeadRepository();
-      this.notifications = new FirestoreNotificationRepository();
-      this.waitlist = new FirestoreWaitlistRepository();
-      this.auditLogs = new FirestoreAuditLogRepository();
-      this.settings = new FirestoreSettingsRepository();
-    } else {
+    if (DEMO_MODE) {
       this.branches = new MockBranchRepository();
       this.customers = new MockCustomerRepository();
       this.reservations = new MockReservationRepository();
@@ -74,6 +61,17 @@ class RepositoryProvider {
       this.waitlist = new MockWaitlistRepository();
       this.auditLogs = new MockAuditLogRepository();
       this.settings = new MockSettingsRepository();
+    } else {
+      this.branches = new ApiBranchRepository();
+      this.customers = new ApiCustomerRepository();
+      this.reservations = new ApiReservationRepository();
+      this.services = new ApiServiceRepository();
+      this.employees = new ApiEmployeeRepository();
+      this.leads = new ApiLeadRepository();
+      this.notifications = new ApiNotificationRepository();
+      this.waitlist = new ApiWaitlistRepository();
+      this.auditLogs = new ApiAuditLogRepository();
+      this.settings = new ApiSettingsRepository();
     }
   }
 }

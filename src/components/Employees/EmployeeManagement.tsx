@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
-import type { Employee, EmployeeSchedule } from '../../types';
+import { CLINIC_ID, type Employee, type EmployeeSchedule } from '../../types';
 import { Plus, Edit3, Trash2, Phone, Mail } from 'lucide-react';
 
 export const EmployeeManagement: React.FC = () => {
@@ -94,7 +94,7 @@ export const EmployeeManagement: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     const payload = {
       name: formData.name,
       role: formData.role,
@@ -119,7 +119,7 @@ export const EmployeeManagement: React.FC = () => {
 
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to deactivate staff member: ${name}?`)) {
-      const org = "org-smilecare-pro";
+      const org = CLINIC_ID;
       await db.employees.delete(org, id);
       await dispatchAuditLog("Doctor Deactivated", `Deactivated doctor: ${name}`);
       await refreshData();

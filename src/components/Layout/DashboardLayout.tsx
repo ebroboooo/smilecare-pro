@@ -35,7 +35,8 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
     { name: t.leads, path: '/admin/leads', icon: GitMerge },
     { name: t.services, path: '/admin/services', icon: Briefcase },
     { name: t.employees, path: '/admin/employees', icon: Stethoscope },
-    ...(hasPermission('BusinessOwner') ? [
+    ...(hasPermission('owner') ? [
+      { name: 'Staff accounts', path: '/admin/users', icon: Users },
       { name: t.reports, path: '/admin/reports', icon: BarChart3 },
       { name: t.settings, path: '/admin/settings', icon: Settings },
     ] : [])
@@ -47,12 +48,11 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
+    void logout().then(() => navigate('/login', { replace: true }));
   };
 
   const handleMarkAllRead = async () => {
-    const org = currentUser?.orgId || 'org-smilecare-pro';
+    const org = currentUser?.orgId || 'clinic';
     await db.notifications.markAllAsRead(org);
     setNotifDropdownOpen(false);
     await refreshData();
@@ -148,7 +148,7 @@ export const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ child
         <header className="hidden md:flex items-center justify-between px-6 lg:px-8 py-4 bg-white border-b border-slate-200 sticky top-0 z-20">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-semibold text-slate-900">{t.welcome}, {currentUser?.name}!</h2>
-            {currentUser?.role !== 'Employee' && (
+            {currentUser?.role !== 'doctor' && (
               <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
                 <Building className="h-4 w-4 text-brand-600" />
                 <select

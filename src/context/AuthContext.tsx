@@ -1,87 +1,132 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { User, UserRole } from '../types';
+import { CLINIC_ID } from '../types';
+import { ApiError, api } from '../db/api';
+import { DEMO_MODE } from '../db';
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string, role: UserRole, branchId?: string | null) => Promise<boolean>;
-  logout: () => void;
+  needsSetup: boolean;
   isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  setup: (input: { name: string; email: string; password: string; businessName: string }) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  logout: () => Promise<void>;
   hasPermission: (requiredRole: UserRole) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = 'smilecare_auth_session';
-const LEGACY_AUTH_STORAGE_KEY = 'reserveflow_auth_session';
-
 const ROLE_RANK: Record<UserRole, number> = {
-  SuperAdmin: 4,
-  BusinessOwner: 3,
-  Receptionist: 2,
-  Employee: 1
+  owner: 3,
+  receptionist: 2,
+  doctor: 1,
 };
 
-const ROLE_DISPLAY_NAMES: Record<UserRole, string> = {
-  SuperAdmin: 'System Administrator',
-  BusinessOwner: 'Clinic Owner',
-  Receptionist: 'Front Desk',
-  Employee: 'Dr. Staff Member'
+const DEMO_USER: User = {
+  id: 'demo-owner',
+  orgId: CLINIC_ID,
+  email: 'owner@smilecare.demo',
+  role: 'owner',
+  name: 'Demo Owner',
+  branchId: null,
+  isActive: true,
 };
-
-function migrateLegacyAuthSession(): string | null {
-  const current = localStorage.getItem(AUTH_STORAGE_KEY);
-  if (current) return current;
-
-  const legacy = localStorage.getItem(LEGACY_AUTH_STORAGE_KEY);
-  if (legacy) {
-    localStorage.setItem(AUTH_STORAGE_KEY, legacy);
-    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
-    return legacy;
-  }
-
-  return null;
-}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const saved = migrateLegacyAuthSession();
-    if (saved) {
-      try {
-        setCurrentUser(JSON.parse(saved));
-      } catch (e) {
-        console.error('Failed to restore auth session', e);
-      }
+  const refreshSession = useCallback(async () => {
+    if (DEMO_MODE) {
+      const saved = sessionStorage.getItem('smilecare_demo_user');
+      setCurrentUser(saved ? JSON.parse(saved) as User : null);
+      setNeedsSetup(false);
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    try {
+      const status = await api<{ needsSetup: boolean }>('/api/setup/status');
+      setNeedsSetup(status.needsSetup);
+      if (!status.needsSetup) {
+        try {
+          const me = await api<{ user: User }>('/api/auth/me');
+          setCurrentUser(me.user);
+        } catch {
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    } catch {
+      setCurrentUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const login = async (email: string, role: UserRole, branchId: string | null = null): Promise<boolean> => {
-    setIsLoading(true);
-    await new Promise(r => setTimeout(r, 400));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void refreshSession();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshSession]);
 
-    const user: User = {
-      id: `usr-${role.toLowerCase()}-${Math.random().toString(36).substring(7)}`,
-      orgId: 'org-smilecare-pro',
-      email,
-      role,
-      name: ROLE_DISPLAY_NAMES[role],
-      branchId: branchId ?? (role === 'Receptionist' || role === 'Employee' ? 'br-main' : null),
-      isActive: true
-    };
-
-    setCurrentUser(user);
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    setIsLoading(false);
-    return true;
+  const login = async (email: string, password: string) => {
+    if (DEMO_MODE) {
+      if (!email.trim() || password.length < 4) throw new Error('Enter your email and a password of at least 4 characters.');
+      const user = { ...DEMO_USER, email: email.trim() };
+      sessionStorage.setItem('smilecare_demo_user', JSON.stringify(user));
+      setCurrentUser(user);
+      return;
+    }
+    try {
+      const result = await api<{ user: User }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      setCurrentUser(result.user);
+      setNeedsSetup(false);
+    } catch (error) {
+      if (error instanceof ApiError) throw new Error(error.message);
+      throw new Error('Unable to sign in. Please try again.');
+    }
   };
 
-  const logout = () => {
+  const setup = async (input: { name: string; email: string; password: string; businessName: string }) => {
+    if (DEMO_MODE) throw new Error('Setup is only available when the clinic API is running.');
+    try {
+      const result = await api<{ user: User }>('/api/setup', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+      setCurrentUser(result.user);
+      setNeedsSetup(false);
+    } catch (error) {
+      if (error instanceof ApiError) throw new Error(error.message);
+      throw new Error('Unable to create the owner account.');
+    }
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    const result = await api<{ user: User }>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    setCurrentUser(result.user);
+  };
+
+  const logout = async () => {
+    if (!DEMO_MODE) {
+      try {
+        await api<void>('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // Clear the local session even if the server is unreachable.
+      }
+    }
+    sessionStorage.removeItem('smilecare_demo_user');
     setCurrentUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-    localStorage.removeItem(LEGACY_AUTH_STORAGE_KEY);
   };
 
   const hasPermission = (requiredRole: UserRole): boolean => {
@@ -90,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isLoading, hasPermission }}>
+    <AuthContext.Provider value={{ currentUser, needsSetup, isLoading, login, setup, changePassword, logout, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

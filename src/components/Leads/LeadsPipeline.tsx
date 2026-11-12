@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
-import type { LeadStatus } from '../../types';
+import { CLINIC_ID, type LeadStatus } from '../../types';
 import { Plus, MoveRight, CheckCircle2 } from 'lucide-react';
 
 const STAGES: LeadStatus[] = ['New', 'Contacted', 'Interested', 'Converted', 'Lost'];
 
 export const LeadsPipeline: React.FC = () => {
-  const { leads, refreshData, dispatchAuditLog, settings } = useApp();
+  const { leads, branches, refreshData, dispatchAuditLog, settings } = useApp();
   
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,9 +27,9 @@ export const LeadsPipeline: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     await db.leads.create(org, {
-      branchId: "br-main",
+      branchId: branches[0]?.id || '',
       fullName: formData.fullName,
       phone: formData.phone,
       email: formData.email,
@@ -47,7 +47,7 @@ export const LeadsPipeline: React.FC = () => {
   };
 
   const handleUpdateStatus = async (id: string, name: string, nextStatus: LeadStatus) => {
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     await db.leads.update(org, id, { status: nextStatus });
     await dispatchAuditLog("Lead Advanced", `Moved CRM Lead ${name} status to ${nextStatus}`);
     await refreshData();

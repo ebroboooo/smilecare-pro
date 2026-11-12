@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
 import { CustomerProfile } from './CustomerProfile';
+import { CLINIC_ID } from '../../types';
 import { Search, UserPlus, Filter, Phone, Mail, Award } from 'lucide-react';
 
 export const CustomerDatabase: React.FC = () => {
@@ -39,7 +40,7 @@ export const CustomerDatabase: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const org = "org-smilecare-pro";
+    const org = CLINIC_ID;
     
     const tagArray = formData.tags
       .split(',')
@@ -64,7 +65,7 @@ export const CustomerDatabase: React.FC = () => {
 
   const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete profile for ${name}?`)) {
-      const org = "org-smilecare-pro";
+      const org = CLINIC_ID;
       await db.customers.delete(org, id);
       await dispatchAuditLog("Patient Deleted", `Removed patient profile: ${name}`);
       if (selectedCustomerId === id) setSelectedCustomerId(null);
