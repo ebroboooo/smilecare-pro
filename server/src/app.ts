@@ -9,6 +9,7 @@ import { logger } from './logger.js';
 import { authRouter } from './routes/auth.js';
 import { publicRouter } from './routes/public.js';
 import { clinicRouter } from './routes/resources.js';
+import { dentalRouter } from './routes/dental.js';
 
 export function createApp() {
   const config = loadConfig();
@@ -47,6 +48,7 @@ export function createApp() {
   app.use('/api', authRouter);
   app.use('/api/public', publicRouter);
   app.use('/api', clinicRouter);
+  app.use('/api', dentalRouter);
 
   app.use(errorHandler);
   return app;

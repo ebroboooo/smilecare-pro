@@ -31,3 +31,10 @@
 - Telegram runs only on the API, using grammY long polling. The bot starts when a token is saved and alerts are turned on. The web app never receives the token back; the settings response has `telegramTokenSet` and the chat id only.
 - Staff alerts include Confirm and Cancel buttons. A patient link is a one-time `/start` token stored as a hash. Reminders for the next 24 hours are recorded in `reminders` and are not sent twice for the same appointment.
 - The in-app notification list was already loaded from `/api/notifications`. Public bookings add a row there as well as a Telegram alert when the bot is configured.
+
+## 2026-11-12 — Phase 4
+
+- The tooth chart uses adult FDI numbers 11–18, 21–28, 31–38, and 41–48. A finding is Sound, Caries, Filled, Missing, Crown, or Root canal. Doctors and receptionists can update it. Teeth with no finding stay Sound and are not stored.
+- A visit is a dated note with complaint, diagnosis, and treatment. It is not a treatment plan.
+- Balance is the sum of appointment fees, excluding cancelled appointments, minus cash and card payments recorded for that patient. Doctors can read the balance. Only an owner or receptionist can record a payment.
+- Treatment plans, file attachments, medical-alert banners, and richer reports are not in this phase.

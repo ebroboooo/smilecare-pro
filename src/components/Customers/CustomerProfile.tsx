@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { db, DEMO_MODE } from '../../db';
 import { api, ApiError } from '../../db/api';
+import { DentalChart } from './DentalChart';
 import { CLINIC_ID } from '../../types';
 import { translations } from '../../utils/translations';
 import { 
@@ -267,6 +268,8 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
         </div>
 
       </div>
+
+      {!DEMO_MODE && <DentalChart patientId={customer.id} />}
 
     </div>
   );
