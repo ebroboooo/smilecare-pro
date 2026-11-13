@@ -20,6 +20,7 @@ export const CustomerDatabase: React.FC = () => {
     phone: '',
     email: '',
     notes: '',
+    medicalAlerts: '',
     tags: '',
     status: 'Active' as 'Active' | 'Inactive'
   });
@@ -56,6 +57,7 @@ export const CustomerDatabase: React.FC = () => {
       phone: formData.phone,
       email: formData.email,
       notes: formData.notes,
+      medicalAlerts: formData.medicalAlerts,
       tags: tagArray,
       status: formData.status
     });
@@ -63,7 +65,7 @@ export const CustomerDatabase: React.FC = () => {
     await dispatchAuditLog("Patient Registered", `Added new patient profile: ${formData.fullName}`);
     setModalOpen(false);
     // Reset form
-    setFormData({ fullName: '', phone: '', email: '', notes: '', tags: '', status: 'Active' });
+    setFormData({ fullName: '', phone: '', email: '', notes: '', medicalAlerts: '', tags: '', status: 'Active' });
     await refreshData();
   };
 
@@ -266,6 +268,17 @@ export const CustomerDatabase: React.FC = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
                   placeholder=""
                   className="w-full input-field text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t.medicalAlerts}</label>
+                <textarea
+                  value={formData.medicalAlerts}
+                  onChange={(e) => setFormData(prev => ({ ...prev, medicalAlerts: e.target.value }))}
+                  rows={2}
+                  className="w-full input-field text-xs"
+                  placeholder="Allergy, pacemaker, …"
                 />
               </div>
 

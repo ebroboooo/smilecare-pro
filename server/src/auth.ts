@@ -12,6 +12,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: Role;
+  orgId: number;
   branchId: number | null;
   doctorId: number | null;
   isActive: boolean;
@@ -83,6 +84,7 @@ interface UserRow {
   password_hash: string;
   name: string;
   role: Role;
+  org_id: number;
   branch_id: number | null;
   doctor_id: number | null;
   is_active: number;
@@ -97,6 +99,7 @@ export function mapUser(row: UserRow): AuthUser {
     email: row.email,
     name: row.name,
     role: row.role,
+    orgId: row.org_id || 1,
     branchId: row.branch_id,
     doctorId: row.doctor_id,
     isActive: row.is_active === 1,
@@ -107,7 +110,7 @@ export function mapUser(row: UserRow): AuthUser {
 export function publicUser(user: AuthUser) {
   return {
     id: String(user.id),
-    orgId: 'clinic',
+    orgId: String(user.orgId),
     email: user.email,
     role: user.role,
     name: user.name,
@@ -158,7 +161,7 @@ export function loadSession(req: Request, _res: Response, next: NextFunction) {
   const row = getDb()
     .prepare(
       `SELECT s.id AS session_id, s.expires_at, s.revoked_at,
-              u.id, u.email, u.password_hash, u.name, u.role, u.branch_id, u.doctor_id,
+              u.id, u.email, u.password_hash, u.name, u.role, u.org_id, u.branch_id, u.doctor_id,
               u.is_active, u.must_change_password, u.failed_login_count, u.locked_until
        FROM sessions s
        JOIN users u ON u.id = s.user_id

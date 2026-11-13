@@ -19,7 +19,7 @@ interface ScheduleRow {
 }
 
 export function readBookingRules(): BookingRules {
-  const row = getDb().prepare('SELECT booking_rules_json FROM settings WHERE id = 1').get() as { booking_rules_json: string };
+  const row = getDb().prepare('SELECT booking_rules_json FROM settings WHERE org_id = 1').get() as { booking_rules_json: string };
   return JSON.parse(row.booking_rules_json) as BookingRules;
 }
 

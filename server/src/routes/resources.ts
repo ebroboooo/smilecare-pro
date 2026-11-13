@@ -7,9 +7,14 @@ import { sendWhatsAppTest } from '../whatsapp.js';
 import { newBookingRef, requireAuth, requireRoles } from '../auth.js';
 import { getDb } from '../db.js';
 import { HttpError, asyncHandler, parseId } from '../http.js';
+import { publicOrgId, requireOrgId } from '../org.js';
 import { getClinicZone, localToUtc, minutesOf, utcToLocal } from '../time.js';
 
 const staffWrite = requireRoles('owner', 'receptionist');
+
+function oid(orgId?: number | null): string {
+  return publicOrgId(orgId ?? 1);
+}
 
 const paging = z.object({
   q: z.string().max(120).optional(),
@@ -91,7 +96,7 @@ function loadDoctor(id: number) {
   }>;
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid((row as { org_id?: number }).org_id),
     branchIds: branches.map((b) => String(b.branch_id)),
     name: row.name,
     role: row.role,
@@ -140,7 +145,7 @@ function loadService(id: number) {
     .all(id) as Array<{ branch_id: number }>;
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(),
     branchIds: branches.map((b) => String(b.branch_id)),
     name: row.name,
     description: row.description,
@@ -153,6 +158,7 @@ function loadService(id: number) {
 
 function mapPatient(row: {
   id: number;
+  org_id?: number;
   full_name: string;
   phone: string;
   email: string;
@@ -161,10 +167,12 @@ function mapPatient(row: {
   status: 'Active' | 'Inactive';
   total_spending: number;
   created_at: string;
+  medical_alerts?: string;
+  national_id?: string;
 }) {
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(row.org_id),
     fullName: row.full_name,
     phone: row.phone,
     email: row.email,
@@ -173,11 +181,14 @@ function mapPatient(row: {
     status: row.status,
     totalSpending: row.total_spending,
     createdAt: row.created_at,
+    medicalAlerts: row.medical_alerts || '',
+    nationalId: row.national_id || '',
   };
 }
 
 interface ApptRow {
   id: number;
+  org_id?: number;
   branch_id: number;
   patient_id: number;
   service_id: number;
@@ -199,7 +210,7 @@ function mapAppointment(row: ApptRow) {
   const local = utcToLocal(row.starts_at, getClinicZone());
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(row.org_id),
     branchId: String(row.branch_id),
     customerId: String(row.patient_id),
     serviceId: String(row.service_id),
@@ -248,6 +259,7 @@ const appointmentBody = z.object({
 });
 
 function mapSettings(row: {
+  org_id?: number;
   business_name: string;
   public_slug: string;
   logo_url: string | null;
@@ -270,9 +282,11 @@ function mapSettings(row: {
   whatsapp_business_account_id?: string | null;
   whatsapp_test_recipient?: string | null;
   whatsapp_last_status?: string | null;
+  whatsapp_reminders_enabled?: number | null;
+  consent_version?: string | null;
 }) {
   return {
-    orgId: 'clinic',
+    orgId: oid(row.org_id),
     businessName: row.business_name,
     publicSlug: row.public_slug,
     logoUrl: row.logo_url || undefined,
@@ -287,6 +301,7 @@ function mapSettings(row: {
       waitlistEnabled: boolean;
       telegramNotifications: boolean;
       publicBookingEnabled: boolean;
+      whatsappReminders?: boolean;
     },
     bookingRules: JSON.parse(row.booking_rules_json) as {
       minNoticeMinutes: number;
@@ -304,11 +319,14 @@ function mapSettings(row: {
     whatsappTestRecipient: row.whatsapp_test_recipient || '',
     whatsappTokenSet: Boolean(row.whatsapp_access_token),
     whatsappLastStatus: row.whatsapp_last_status || '',
+    whatsappRemindersEnabled: row.whatsapp_reminders_enabled === 1,
+    consentVersion: row.consent_version || 'eg-pdpl-2026.1',
+    complianceCertified: false,
   };
 }
 
-function readSettings() {
-  const row = getDb().prepare('SELECT * FROM settings WHERE id = 1').get() as Parameters<typeof mapSettings>[0];
+function readSettings(orgId = 1) {
+  const row = getDb().prepare('SELECT * FROM settings WHERE org_id = ?').get(orgId) as Parameters<typeof mapSettings>[0];
   return mapSettings(row);
 }
 
@@ -316,15 +334,22 @@ export const clinicRouter = Router();
 clinicRouter.use(requireAuth);
 
 clinicRouter.get('/branches', (req, res) => {
+  const orgId = requireOrgId(req);
   const query = paging.parse(req.query);
   const { limit, offset } = pageClause(query.page, query.pageSize);
-  const where = query.q ? `WHERE name LIKE ?` : '';
-  const params = query.q ? [likeTerm(query.q)] : [];
+  const filters = ['org_id = ?'];
+  const params: unknown[] = [orgId];
+  if (query.q) {
+    filters.push('name LIKE ?');
+    params.push(likeTerm(query.q));
+  }
+  const where = `WHERE ${filters.join(' AND ')}`;
   const total = (getDb().prepare(`SELECT COUNT(*) AS c FROM branches ${where}`).get(...params) as { c: number }).c;
   const rows = getDb()
     .prepare(`SELECT * FROM branches ${where} ORDER BY id LIMIT ? OFFSET ?`)
     .all(...params, limit, offset) as Array<{
     id: number;
+    org_id?: number;
     name: string;
     address: string;
     phone: string;
@@ -336,7 +361,7 @@ clinicRouter.get('/branches', (req, res) => {
     res,
     rows.map((row) => ({
       id: String(row.id),
-      orgId: 'clinic',
+      orgId: oid(row.org_id),
       name: row.name,
       address: row.address,
       phone: row.phone,
@@ -351,14 +376,15 @@ clinicRouter.get('/branches', (req, res) => {
 });
 
 clinicRouter.get('/branches/:id', (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Branch');
-  const row = getDb().prepare('SELECT * FROM branches WHERE id = ?').get(id) as
-    | { id: number; name: string; address: string; phone: string; email: string; timezone: string; is_active: number }
+  const row = getDb().prepare('SELECT * FROM branches WHERE id = ? AND org_id = ?').get(id, orgId) as
+    | { id: number; org_id?: number; name: string; address: string; phone: string; email: string; timezone: string; is_active: number }
     | undefined;
   if (!row) throw new HttpError(404, 'NOT_FOUND', 'Branch not found');
   res.json({
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(row.org_id),
     name: row.name,
     address: row.address,
     phone: row.phone,
@@ -378,16 +404,17 @@ const branchBody = z.object({
 });
 
 clinicRouter.post('/branches', staffWrite, validateBody(branchBody), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = req.body as z.infer<typeof branchBody>;
   const info = getDb()
     .prepare(
-      `INSERT INTO branches (name, address, phone, email, timezone, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO branches (name, address, phone, email, timezone, is_active, created_at, org_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(body.name, body.address, body.phone, body.email, body.timezone || getClinicZone(), body.isActive ? 1 : 0, new Date().toISOString());
+    .run(body.name, body.address, body.phone, body.email, body.timezone || getClinicZone(), body.isActive ? 1 : 0, new Date().toISOString(), orgId);
   writeAudit(req.user!, 'branch_created', `Created location ${body.name}`);
   res.status(201).json({
     id: String(info.lastInsertRowid),
-    orgId: 'clinic',
+    orgId: oid(orgId),
     name: body.name,
     address: body.address,
     phone: body.phone,
@@ -416,7 +443,7 @@ clinicRouter.patch('/branches/:id', staffWrite, (req, res) => {
     .prepare(`UPDATE branches SET name = ?, address = ?, phone = ?, email = ?, timezone = ?, is_active = ? WHERE id = ?`)
     .run(next.name, next.address, next.phone, next.email, next.timezone, next.isActive ? 1 : 0, id);
   writeAudit(req.user!, 'branch_updated', `Updated location ${id}`);
-  res.json({ id: String(id), orgId: 'clinic', ...next });
+  res.json({ id: String(id), orgId: oid(), ...next });
 });
 
 clinicRouter.delete('/branches/:id', staffWrite, (req, res) => {
@@ -437,10 +464,11 @@ const patientBody = z.object({
 });
 
 clinicRouter.get('/patients', (req, res) => {
+  const orgId = requireOrgId(req);
   const query = paging.parse(req.query);
   const { limit, offset } = pageClause(query.page, query.pageSize);
-  const filters = ['deleted_at IS NULL'];
-  const params: unknown[] = [];
+  const filters = ['deleted_at IS NULL', 'org_id = ?'];
+  const params: unknown[] = [orgId];
   if (query.q) {
     filters.push('(full_name LIKE ? OR phone LIKE ? OR email LIKE ?)');
     const term = likeTerm(query.q);
@@ -455,27 +483,52 @@ clinicRouter.get('/patients', (req, res) => {
 });
 
 clinicRouter.get('/patients/:id', (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Patient');
-  const row = getDb().prepare(`SELECT * FROM patients WHERE id = ? AND deleted_at IS NULL`).get(id) as
+  const row = getDb().prepare(`SELECT * FROM patients WHERE id = ? AND org_id = ? AND deleted_at IS NULL`).get(id, orgId) as
     | Parameters<typeof mapPatient>[0]
     | undefined;
   if (!row) throw new HttpError(404, 'NOT_FOUND', 'Patient not found');
+  getDb()
+    .prepare(
+      `INSERT INTO patient_access_logs (org_id, patient_id, user_id, user_name, action, created_at)
+       VALUES (?, ?, ?, ?, 'view', ?)`,
+    )
+    .run(orgId, id, req.user!.id, req.user!.name, new Date().toISOString());
   res.json(mapPatient(row));
 });
 
-clinicRouter.post('/patients', staffWrite, validateBody(patientBody), (req, res) => {
-  const body = req.body as z.infer<typeof patientBody>;
+const patientBodyExtended = patientBody.extend({
+  medicalAlerts: z.string().max(2000).optional().default(''),
+  nationalId: z.string().trim().max(20).optional().default(''),
+});
+
+clinicRouter.post('/patients', staffWrite, validateBody(patientBodyExtended), (req, res) => {
+  const orgId = requireOrgId(req);
+  const body = req.body as z.infer<typeof patientBodyExtended>;
   const now = new Date().toISOString();
   const info = getDb()
     .prepare(
-      `INSERT INTO patients (full_name, phone, email, notes, tags, status, total_spending, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+      `INSERT INTO patients (full_name, phone, email, notes, tags, status, total_spending, created_at, org_id, medical_alerts, national_id)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
     )
-    .run(body.fullName, body.phone, body.email, body.notes, JSON.stringify(body.tags), body.status, now);
+    .run(
+      body.fullName,
+      body.phone,
+      body.email,
+      body.notes,
+      JSON.stringify(body.tags),
+      body.status,
+      now,
+      orgId,
+      body.medicalAlerts,
+      body.nationalId,
+    );
   writeAudit(req.user!, 'patient_created', 'Patient record created');
   res.status(201).json(
     mapPatient({
       id: Number(info.lastInsertRowid),
+      org_id: orgId,
       full_name: body.fullName,
       phone: body.phone,
       email: body.email,
@@ -484,14 +537,17 @@ clinicRouter.post('/patients', staffWrite, validateBody(patientBody), (req, res)
       status: body.status,
       total_spending: 0,
       created_at: now,
+      medical_alerts: body.medicalAlerts,
+      national_id: body.nationalId,
     }),
   );
 });
 
 clinicRouter.patch('/patients/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Patient');
-  const body = patientBody.partial().parse(req.body);
-  const existing = getDb().prepare(`SELECT * FROM patients WHERE id = ? AND deleted_at IS NULL`).get(id) as
+  const body = patientBodyExtended.partial().parse(req.body);
+  const existing = getDb().prepare(`SELECT * FROM patients WHERE id = ? AND org_id = ? AND deleted_at IS NULL`).get(id, orgId) as
     | Parameters<typeof mapPatient>[0]
     | undefined;
   if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Patient not found');
@@ -502,19 +558,25 @@ clinicRouter.patch('/patients/:id', staffWrite, (req, res) => {
     notes: body.notes ?? existing.notes,
     tags: body.tags ? JSON.stringify(body.tags) : existing.tags,
     status: body.status ?? existing.status,
+    medical_alerts: body.medicalAlerts ?? existing.medical_alerts ?? '',
+    national_id: body.nationalId ?? existing.national_id ?? '',
   };
   getDb()
-    .prepare(`UPDATE patients SET full_name = ?, phone = ?, email = ?, notes = ?, tags = ?, status = ? WHERE id = ?`)
-    .run(next.full_name, next.phone, next.email, next.notes, next.tags, next.status, id);
+    .prepare(
+      `UPDATE patients SET full_name = ?, phone = ?, email = ?, notes = ?, tags = ?, status = ?, medical_alerts = ?, national_id = ?
+       WHERE id = ? AND org_id = ?`,
+    )
+    .run(next.full_name, next.phone, next.email, next.notes, next.tags, next.status, next.medical_alerts, next.national_id, id, orgId);
   writeAudit(req.user!, 'patient_updated', `Updated patient ${id}`);
   res.json(mapPatient({ ...existing, ...next }));
 });
 
 clinicRouter.delete('/patients/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Patient');
   const info = getDb()
-    .prepare(`UPDATE patients SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`)
-    .run(new Date().toISOString(), id);
+    .prepare(`UPDATE patients SET deleted_at = ? WHERE id = ? AND org_id = ? AND deleted_at IS NULL`)
+    .run(new Date().toISOString(), id, orgId);
   if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Patient not found');
   writeAudit(req.user!, 'patient_deleted', `Soft-deleted patient ${id}`);
   res.json(true);
@@ -530,24 +592,32 @@ const doctorBody = z.object({
   schedule: z.array(scheduleSchema).max(7).optional(),
 });
 
-clinicRouter.get('/doctors', (_req, res) => {
-  const rows = getDb().prepare(`SELECT id FROM doctors WHERE deleted_at IS NULL ORDER BY id`).all() as Array<{ id: number }>;
-  res.json(rows.map((row) => loadDoctor(row.id)));
+clinicRouter.get('/doctors', (req, res) => {
+  const orgId = requireOrgId(req);
+  const rows = getDb()
+    .prepare(`SELECT id FROM doctors WHERE deleted_at IS NULL AND org_id = ? ORDER BY id`)
+    .all(orgId) as Array<{ id: number }>;
+  res.json(rows.map((row) => loadDoctor(row.id)).filter(Boolean));
 });
 
 clinicRouter.get('/doctors/:id', (req, res) => {
-  const doctor = loadDoctor(parseId(req.params.id, 'Doctor'));
+  const orgId = requireOrgId(req);
+  const id = parseId(req.params.id, 'Doctor');
+  const owned = getDb().prepare(`SELECT id FROM doctors WHERE id = ? AND org_id = ? AND deleted_at IS NULL`).get(id, orgId);
+  if (!owned) throw new HttpError(404, 'NOT_FOUND', 'Doctor not found');
+  const doctor = loadDoctor(id);
   if (!doctor) throw new HttpError(404, 'NOT_FOUND', 'Doctor not found');
   res.json(doctor);
 });
 
 clinicRouter.post('/doctors', staffWrite, validateBody(doctorBody), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = req.body as z.infer<typeof doctorBody>;
   const now = new Date().toISOString();
   const create = getDb().transaction(() => {
     const info = getDb()
-      .prepare(`INSERT INTO doctors (name, role, email, phone, status, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(body.name, body.role, body.email, body.phone, body.status, now);
+      .prepare(`INSERT INTO doctors (name, role, email, phone, status, created_at, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(body.name, body.role, body.email, body.phone, body.status, now, orgId);
     const id = Number(info.lastInsertRowid);
     replaceDoctorLinks(id, body.branchIds, body.schedule ?? defaultSchedule());
     return id;
@@ -558,14 +628,17 @@ clinicRouter.post('/doctors', staffWrite, validateBody(doctorBody), (req, res) =
 });
 
 clinicRouter.patch('/doctors/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Doctor');
+  const owned = getDb().prepare(`SELECT id FROM doctors WHERE id = ? AND org_id = ? AND deleted_at IS NULL`).get(id, orgId);
+  if (!owned) throw new HttpError(404, 'NOT_FOUND', 'Doctor not found');
   const existing = loadDoctor(id);
   if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Doctor not found');
   const body = doctorBody.partial().parse(req.body);
   const apply = getDb().transaction(() => {
     getDb()
-      .prepare(`UPDATE doctors SET name = ?, role = ?, email = ?, phone = ?, status = ? WHERE id = ?`)
-      .run(body.name ?? existing.name, body.role ?? existing.role, body.email ?? existing.email, body.phone ?? existing.phone, body.status ?? existing.status, id);
+      .prepare(`UPDATE doctors SET name = ?, role = ?, email = ?, phone = ?, status = ? WHERE id = ? AND org_id = ?`)
+      .run(body.name ?? existing.name, body.role ?? existing.role, body.email ?? existing.email, body.phone ?? existing.phone, body.status ?? existing.status, id, orgId);
     if (body.branchIds || body.schedule) {
       replaceDoctorLinks(id, body.branchIds ?? existing.branchIds, body.schedule ?? existing.schedule);
     }
@@ -576,8 +649,11 @@ clinicRouter.patch('/doctors/:id', staffWrite, (req, res) => {
 });
 
 clinicRouter.delete('/doctors/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Doctor');
-  const info = getDb().prepare(`UPDATE doctors SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL`).run(new Date().toISOString(), id);
+  const info = getDb()
+    .prepare(`UPDATE doctors SET deleted_at = ? WHERE id = ? AND org_id = ? AND deleted_at IS NULL`)
+    .run(new Date().toISOString(), id, orgId);
   if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Doctor not found');
   writeAudit(req.user!, 'doctor_deleted', `Soft-deleted doctor ${id}`);
   res.json(true);
@@ -593,23 +669,33 @@ const serviceBody = z.object({
   branchIds: z.array(z.string().regex(/^\d+$/)).max(20).optional().default([]),
 });
 
-clinicRouter.get('/services', (_req, res) => {
-  const rows = getDb().prepare(`SELECT id FROM services WHERE deleted_at IS NULL ORDER BY id`).all() as Array<{ id: number }>;
-  res.json(rows.map((row) => loadService(row.id)));
+clinicRouter.get('/services', (req, res) => {
+  const orgId = requireOrgId(req);
+  const rows = getDb()
+    .prepare(`SELECT id FROM services WHERE deleted_at IS NULL AND org_id = ? ORDER BY id`)
+    .all(orgId) as Array<{ id: number }>;
+  res.json(rows.map((row) => loadService(row.id)).filter(Boolean));
 });
 
 clinicRouter.get('/services/:id', (req, res) => {
-  const service = loadService(parseId(req.params.id, 'Service'));
+  const orgId = requireOrgId(req);
+  const id = parseId(req.params.id, 'Service');
+  const owned = getDb().prepare(`SELECT id FROM services WHERE id = ? AND org_id = ? AND deleted_at IS NULL`).get(id, orgId);
+  if (!owned) throw new HttpError(404, 'NOT_FOUND', 'Service not found');
+  const service = loadService(id);
   if (!service) throw new HttpError(404, 'NOT_FOUND', 'Service not found');
   res.json(service);
 });
 
 clinicRouter.post('/services', staffWrite, validateBody(serviceBody), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = req.body as z.infer<typeof serviceBody>;
   const create = getDb().transaction(() => {
     const info = getDb()
-      .prepare(`INSERT INTO services (name, description, duration, price, category, status) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(body.name, body.description, body.duration, body.price, body.category, body.status);
+      .prepare(
+        `INSERT INTO services (name, description, duration, price, category, status, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(body.name, body.description, body.duration, body.price, body.category, body.status, orgId);
     const id = Number(info.lastInsertRowid);
     const link = getDb().prepare('INSERT INTO service_branches (service_id, branch_id) VALUES (?, ?)');
     for (const branchId of body.branchIds) link.run(id, Number(branchId));
@@ -684,10 +770,11 @@ clinicRouter.get(
 );
 
 clinicRouter.get('/appointments', (req, res) => {
+  const orgId = requireOrgId(req);
   const query = paging.parse(req.query);
   const { limit, offset } = pageClause(query.page, query.pageSize);
-  const filters: string[] = [];
-  const params: unknown[] = [];
+  const filters: string[] = ['org_id = ?'];
+  const params: unknown[] = [orgId];
   if (query.branchId) {
     filters.push('branch_id = ?');
     params.push(Number(query.branchId));
@@ -700,7 +787,7 @@ clinicRouter.get('/appointments', (req, res) => {
     filters.push('starts_at < ?');
     params.push(localToUtc(query.end, '00:00', getClinicZone()).plus({ days: 1 }).toISO());
   }
-  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const where = `WHERE ${filters.join(' AND ')}`;
   const total = (getDb().prepare(`SELECT COUNT(*) AS c FROM appointments ${where}`).get(...params) as { c: number }).c;
   const rows = getDb()
     .prepare(`SELECT * FROM appointments ${where} ORDER BY starts_at DESC LIMIT ? OFFSET ?`)
@@ -709,12 +796,16 @@ clinicRouter.get('/appointments', (req, res) => {
 });
 
 clinicRouter.get('/appointments/:id', (req, res) => {
-  const row = getDb().prepare('SELECT * FROM appointments WHERE id = ?').get(parseId(req.params.id, 'Appointment')) as ApptRow | undefined;
+  const orgId = requireOrgId(req);
+  const row = getDb()
+    .prepare('SELECT * FROM appointments WHERE id = ? AND org_id = ?')
+    .get(parseId(req.params.id, 'Appointment'), orgId) as ApptRow | undefined;
   if (!row) throw new HttpError(404, 'NOT_FOUND', 'Appointment not found');
   res.json(mapAppointment(row));
 });
 
 clinicRouter.post('/appointments', staffWrite, validateBody(appointmentBody), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = req.body as z.infer<typeof appointmentBody>;
   const start = localToUtc(body.date, body.time, getClinicZone());
   const end = start.plus({ minutes: body.duration });
@@ -734,8 +825,8 @@ clinicRouter.post('/appointments', staffWrite, validateBody(appointmentBody), (r
       .prepare(
         `INSERT INTO appointments (
           branch_id, patient_id, service_id, doctor_id, starts_at, ends_at, duration_min, notes,
-          status, payment_status, payment_method, payment_amount, payment_txn, paid_at, booking_ref, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'staff', ?, ?)`,
+          status, payment_status, payment_method, payment_amount, payment_txn, paid_at, booking_ref, source, created_at, updated_at, org_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'staff', ?, ?, ?)`,
       )
       .run(
         Number(body.branchId),
@@ -755,6 +846,7 @@ clinicRouter.post('/appointments', staffWrite, validateBody(appointmentBody), (r
         newBookingRef(),
         now,
         now,
+        orgId,
       );
     return Number(info.lastInsertRowid);
   });
@@ -856,6 +948,7 @@ const leadBody = z.object({
 
 function mapLead(row: {
   id: number;
+  org_id?: number;
   branch_id: number;
   full_name: string;
   phone: string;
@@ -869,7 +962,7 @@ function mapLead(row: {
 }) {
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(row.org_id),
     branchId: String(row.branch_id),
     fullName: row.full_name,
     phone: row.phone,
@@ -884,43 +977,59 @@ function mapLead(row: {
 }
 
 clinicRouter.get('/leads', (req, res) => {
+  const orgId = requireOrgId(req);
   const query = paging.parse(req.query);
   const { limit, offset } = pageClause(query.page, query.pageSize);
-  const filters: string[] = [];
-  const params: unknown[] = [];
+  const filters: string[] = ['org_id = ?'];
+  const params: unknown[] = [orgId];
   if (query.q) {
     filters.push('(full_name LIKE ? OR phone LIKE ?)');
     const term = likeTerm(query.q);
     params.push(term, term);
   }
-  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const where = `WHERE ${filters.join(' AND ')}`;
   const total = (getDb().prepare(`SELECT COUNT(*) AS c FROM leads ${where}`).get(...params) as { c: number }).c;
   const rows = getDb().prepare(`SELECT * FROM leads ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
   sendList(res, (rows as Parameters<typeof mapLead>[0][]).map(mapLead), total, query.page, query.pageSize);
 });
 
 clinicRouter.post('/leads', staffWrite, validateBody(leadBody), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = req.body as z.infer<typeof leadBody>;
   const now = new Date().toISOString();
   const info = getDb()
     .prepare(
-      `INSERT INTO leads (branch_id, full_name, phone, email, source, status, value, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (branch_id, full_name, phone, email, source, status, value, notes, created_at, updated_at, org_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(Number(body.branchId), body.fullName, body.phone, body.email, body.source, body.status, body.value, body.notes, now, now);
+    .run(Number(body.branchId), body.fullName, body.phone, body.email, body.source, body.status, body.value, body.notes, now, now, orgId);
   writeAudit(req.user!, 'lead_created', 'Inquiry captured');
-  res.status(201).json(mapLead({ id: Number(info.lastInsertRowid), branch_id: Number(body.branchId), full_name: body.fullName, phone: body.phone, email: body.email, source: body.source, status: body.status, value: body.value, notes: body.notes, created_at: now, updated_at: now }));
+  res.status(201).json(mapLead({
+    id: Number(info.lastInsertRowid),
+    org_id: orgId,
+    branch_id: Number(body.branchId),
+    full_name: body.fullName,
+    phone: body.phone,
+    email: body.email,
+    source: body.source,
+    status: body.status,
+    value: body.value,
+    notes: body.notes,
+    created_at: now,
+    updated_at: now,
+  }));
 });
 
 clinicRouter.patch('/leads/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Lead');
-  const existing = getDb().prepare('SELECT * FROM leads WHERE id = ?').get(id) as Parameters<typeof mapLead>[0] | undefined;
+  const existing = getDb().prepare('SELECT * FROM leads WHERE id = ? AND org_id = ?').get(id, orgId) as Parameters<typeof mapLead>[0] | undefined;
   if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Lead not found');
   const body = leadBody.partial().parse(req.body);
   const now = new Date().toISOString();
   getDb()
     .prepare(
-      `UPDATE leads SET branch_id = ?, full_name = ?, phone = ?, email = ?, source = ?, status = ?, value = ?, notes = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE leads SET branch_id = ?, full_name = ?, phone = ?, email = ?, source = ?, status = ?, value = ?, notes = ?, updated_at = ? WHERE id = ? AND org_id = ?`,
     )
     .run(
       body.branchId ? Number(body.branchId) : existing.branch_id,
@@ -933,14 +1042,16 @@ clinicRouter.patch('/leads/:id', staffWrite, (req, res) => {
       body.notes ?? existing.notes,
       now,
       id,
+      orgId,
     );
   writeAudit(req.user!, 'lead_updated', `Updated inquiry ${id}`);
   res.json(mapLead(getDb().prepare('SELECT * FROM leads WHERE id = ?').get(id) as Parameters<typeof mapLead>[0]));
 });
 
 clinicRouter.delete('/leads/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Lead');
-  const info = getDb().prepare('DELETE FROM leads WHERE id = ?').run(id);
+  const info = getDb().prepare('DELETE FROM leads WHERE id = ? AND org_id = ?').run(id, orgId);
   if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Lead not found');
   writeAudit(req.user!, 'lead_deleted', `Deleted inquiry ${id}`);
   res.json(true);
@@ -959,6 +1070,7 @@ const waitBody = z.object({
 
 function mapWait(row: {
   id: number;
+  org_id?: number;
   branch_id: number;
   patient_id: number;
   service_id: number;
@@ -971,7 +1083,7 @@ function mapWait(row: {
 }) {
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(row.org_id),
     branchId: String(row.branch_id),
     customerId: String(row.patient_id),
     serviceId: String(row.service_id),
@@ -985,9 +1097,10 @@ function mapWait(row: {
 }
 
 clinicRouter.get('/waitlist', (req, res) => {
+  const orgId = requireOrgId(req);
   const query = paging.parse(req.query);
-  const filters: string[] = [];
-  const params: unknown[] = [];
+  const filters: string[] = ['org_id = ?'];
+  const params: unknown[] = [orgId];
   if (query.branchId) {
     filters.push('branch_id = ?');
     params.push(Number(query.branchId));
@@ -996,18 +1109,19 @@ clinicRouter.get('/waitlist', (req, res) => {
     filters.push('status = ?');
     params.push(query.status);
   }
-  const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+  const where = `WHERE ${filters.join(' AND ')}`;
   const rows = getDb().prepare(`SELECT * FROM waitlist ${where} ORDER BY id DESC LIMIT 1000`).all(...params) as Parameters<typeof mapWait>[0][];
   res.json(rows.map(mapWait));
 });
 
 clinicRouter.post('/waitlist', staffWrite, validateBody(waitBody), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = req.body as z.infer<typeof waitBody>;
   const now = new Date().toISOString();
   const info = getDb()
     .prepare(
-      `INSERT INTO waitlist (branch_id, patient_id, service_id, doctor_id, date, time_pref, notes, status, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO waitlist (branch_id, patient_id, service_id, doctor_id, date, time_pref, notes, status, created_at, org_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       Number(body.branchId),
@@ -1019,11 +1133,13 @@ clinicRouter.post('/waitlist', staffWrite, validateBody(waitBody), (req, res) =>
       body.notes,
       body.status,
       now,
+      orgId,
     );
   writeAudit(req.user!, 'waitlist_created', 'Waitlist entry created');
   res.status(201).json(
     mapWait({
       id: Number(info.lastInsertRowid),
+      org_id: orgId,
       branch_id: Number(body.branchId),
       patient_id: Number(body.customerId),
       service_id: Number(body.serviceId),
@@ -1038,12 +1154,13 @@ clinicRouter.post('/waitlist', staffWrite, validateBody(waitBody), (req, res) =>
 });
 
 clinicRouter.patch('/waitlist/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Waitlist entry');
-  const existing = getDb().prepare('SELECT * FROM waitlist WHERE id = ?').get(id) as Parameters<typeof mapWait>[0] | undefined;
+  const existing = getDb().prepare('SELECT * FROM waitlist WHERE id = ? AND org_id = ?').get(id, orgId) as Parameters<typeof mapWait>[0] | undefined;
   if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Waitlist entry not found');
   const body = waitBody.partial().parse(req.body);
   getDb()
-    .prepare(`UPDATE waitlist SET status = ?, notes = ?, date = ?, time_pref = ?, doctor_id = ? WHERE id = ?`)
+    .prepare(`UPDATE waitlist SET status = ?, notes = ?, date = ?, time_pref = ?, doctor_id = ? WHERE id = ? AND org_id = ?`)
     .run(
       body.status ?? existing.status,
       body.notes ?? existing.notes,
@@ -1051,29 +1168,32 @@ clinicRouter.patch('/waitlist/:id', staffWrite, (req, res) => {
       body.timeSlotPreference ?? existing.time_pref,
       body.employeeId ? Number(body.employeeId) : existing.doctor_id,
       id,
+      orgId,
     );
   writeAudit(req.user!, 'waitlist_updated', `Updated waitlist ${id}`);
   res.json(mapWait(getDb().prepare('SELECT * FROM waitlist WHERE id = ?').get(id) as Parameters<typeof mapWait>[0]));
 });
 
 clinicRouter.delete('/waitlist/:id', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Waitlist entry');
-  const info = getDb().prepare('DELETE FROM waitlist WHERE id = ?').run(id);
+  const info = getDb().prepare('DELETE FROM waitlist WHERE id = ? AND org_id = ?').run(id, orgId);
   if (info.changes === 0) throw new HttpError(404, 'NOT_FOUND', 'Waitlist entry not found');
   writeAudit(req.user!, 'waitlist_deleted', `Deleted waitlist ${id}`);
   res.json(true);
 });
 
 clinicRouter.post('/waitlist/:id/promote', staffWrite, (req, res) => {
+  const orgId = requireOrgId(req);
   const id = parseId(req.params.id, 'Waitlist entry');
-  const item = getDb().prepare('SELECT * FROM waitlist WHERE id = ?').get(id) as Parameters<typeof mapWait>[0] | undefined;
+  const item = getDb().prepare('SELECT * FROM waitlist WHERE id = ? AND org_id = ?').get(id, orgId) as Parameters<typeof mapWait>[0] | undefined;
   if (!item || item.status !== 'Waiting') throw new HttpError(404, 'NOT_FOUND', 'Waitlist entry not found');
-  const service = getDb().prepare('SELECT duration, price FROM services WHERE id = ? AND deleted_at IS NULL').get(item.service_id) as
+  const service = getDb().prepare('SELECT duration, price FROM services WHERE id = ? AND org_id = ? AND deleted_at IS NULL').get(item.service_id, orgId) as
     | { duration: number; price: number }
     | undefined;
   if (!service) throw new HttpError(409, 'UNAVAILABLE', 'The requested service is no longer available');
   const doctorId = item.doctor_id
-    ?? (getDb().prepare(`SELECT id FROM doctors WHERE deleted_at IS NULL AND status = 'Active' ORDER BY id LIMIT 1`).get() as { id: number } | undefined)?.id;
+    ?? (getDb().prepare(`SELECT id FROM doctors WHERE deleted_at IS NULL AND status = 'Active' AND org_id = ? ORDER BY id LIMIT 1`).get(orgId) as { id: number } | undefined)?.id;
   if (!doctorId) throw new HttpError(409, 'UNAVAILABLE', 'No doctor is available');
   const slots = slotsForDoctor({
     doctorId,
@@ -1110,11 +1230,11 @@ clinicRouter.post('/waitlist/:id/promote', staffWrite, (req, res) => {
       .prepare(
         `INSERT INTO appointments (
           branch_id, patient_id, service_id, doctor_id, starts_at, ends_at, duration_min, notes,
-          status, payment_status, payment_method, payment_amount, booking_ref, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Unpaid', 'Cash', ?, ?, 'waitlist', ?, ?)`,
+          status, payment_status, payment_method, payment_amount, booking_ref, source, created_at, updated_at, org_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Unpaid', 'Cash', ?, ?, 'waitlist', ?, ?, ?)`,
       )
-      .run(item.branch_id, item.patient_id, item.service_id, doctorId, start.toISO(), end.toISO(), service.duration, `Promoted from waitlist. ${item.notes}`, service.price, newBookingRef(), now, now);
-    getDb().prepare(`UPDATE waitlist SET status = 'Promoted' WHERE id = ?`).run(id);
+      .run(item.branch_id, item.patient_id, item.service_id, doctorId, start.toISO(), end.toISO(), service.duration, `Promoted from waitlist. ${item.notes}`, service.price, newBookingRef(), now, now, orgId);
+    getDb().prepare(`UPDATE waitlist SET status = 'Promoted' WHERE id = ? AND org_id = ?`).run(id, orgId);
     return Number(info.lastInsertRowid);
   });
   const appointmentId = create.immediate();
@@ -1175,7 +1295,7 @@ clinicRouter.get('/holidays', (_req, res) => {
   }>;
   res.json(rows.map((row) => ({
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(),
     branchId: String(row.branch_id),
     date: row.date,
     label: row.label,
@@ -1190,7 +1310,7 @@ clinicRouter.post('/holidays', staffWrite, validateBody(holidayBody), (req, res)
       .prepare(`INSERT INTO clinic_holidays (branch_id, date, label, prevent_bookings) VALUES (?, ?, ?, ?)`)
       .run(Number(body.branchId), body.date, body.label, body.preventBookings ? 1 : 0);
     writeAudit(req.user!, 'holiday_created', `Closed ${body.date}`);
-    res.status(201).json({ id: String(info.lastInsertRowid), orgId: 'clinic', branchId: body.branchId, date: body.date, label: body.label, preventBookings: body.preventBookings });
+    res.status(201).json({ id: String(info.lastInsertRowid), orgId: oid(), branchId: body.branchId, date: body.date, label: body.label, preventBookings: body.preventBookings });
   } catch (error) {
     if (String(error).includes('UNIQUE')) throw new HttpError(409, 'CONFLICT', 'That date is already closed');
     throw error;
@@ -1223,7 +1343,7 @@ function mapNote(row: {
 }) {
   return {
     id: String(row.id),
-    orgId: 'clinic',
+    orgId: oid(),
     branchId: row.branch_id == null ? null : String(row.branch_id),
     title: row.title,
     message: row.message,
@@ -1283,7 +1403,7 @@ clinicRouter.delete('/notifications/:id', staffWrite, (req, res) => {
 });
 
 clinicRouter.get('/settings', (req, res) => {
-  const settings = readSettings();
+  const settings = readSettings(requireOrgId(req));
   if (req.user?.role === 'owner') {
     res.json(settings);
     return;
@@ -1301,6 +1421,7 @@ clinicRouter.get('/settings', (req, res) => {
     whatsappTestRecipient: _waTo,
     whatsappTokenSet: _waTok,
     whatsappLastStatus: _waStatus,
+    whatsappRemindersEnabled: _waRem,
     ...safe
   } = settings;
   res.json(safe);
@@ -1322,6 +1443,7 @@ const settingsPatch = z.object({
       waitlistEnabled: z.boolean().optional(),
       telegramNotifications: z.boolean().optional(),
       publicBookingEnabled: z.boolean().optional(),
+      whatsappReminders: z.boolean().optional(),
     })
     .optional(),
   bookingRules: z
@@ -1341,15 +1463,20 @@ const settingsPatch = z.object({
   whatsappAccessToken: z.string().trim().min(20).max(500).optional(),
   whatsappBusinessAccountId: z.string().trim().max(40).regex(/^$|^\d{5,40}$/).optional(),
   whatsappTestRecipient: z.string().trim().max(20).regex(/^$|^\d{8,15}$/).optional(),
+  whatsappRemindersEnabled: z.boolean().optional(),
 });
 
 clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
+  const orgId = requireOrgId(req);
   const body = settingsPatch.parse(req.body);
-  const current = readSettings();
+  const current = readSettings(orgId);
   const features = {
     ...current.features,
     ...(body.features ?? {}),
     ...(body.telegramEnabled === undefined ? {} : { telegramNotifications: body.telegramEnabled }),
+    ...(body.whatsappRemindersEnabled === undefined
+      ? {}
+      : { whatsappReminders: body.whatsappRemindersEnabled }),
   };
   const bookingRules = { ...current.bookingRules, ...(body.bookingRules ?? {}) };
   const next = {
@@ -1369,7 +1496,7 @@ clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
       .prepare(
         `UPDATE settings SET business_name = ?, public_slug = ?, logo_url = ?, address = ?, phone = ?, email = ?,
          currency = ?, language = ?, is_rtl = ?, timezone = ?, features_json = ?, booking_rules_json = ?, updated_at = ?
-         WHERE id = 1`,
+         WHERE org_id = ?`,
       )
       .run(
         next.businessName,
@@ -1385,41 +1512,52 @@ clinicRouter.patch('/settings', requireRoles('owner'), (req, res) => {
         JSON.stringify(features),
         JSON.stringify(bookingRules),
         new Date().toISOString(),
+        orgId,
       );
   } catch (error) {
     if (String(error).includes('UNIQUE')) throw new HttpError(409, 'CONFLICT', 'That public booking link is already in use');
     throw error;
   }
+  if (body.businessName) {
+    getDb().prepare('UPDATE organizations SET name = ?, updated_at = ? WHERE id = ?').run(body.businessName, new Date().toISOString(), orgId);
+  }
   if (body.telegramBotToken) {
-    getDb().prepare('UPDATE settings SET telegram_bot_token = ? WHERE id = 1').run(body.telegramBotToken);
+    getDb().prepare('UPDATE settings SET telegram_bot_token = ? WHERE org_id = ?').run(body.telegramBotToken, orgId);
   }
   if (body.telegramChatId !== undefined) {
-    getDb().prepare('UPDATE settings SET telegram_chat_id = ? WHERE id = 1').run(body.telegramChatId);
+    getDb().prepare('UPDATE settings SET telegram_chat_id = ? WHERE org_id = ?').run(body.telegramChatId, orgId);
   }
   if (body.telegramEnabled !== undefined) {
-    getDb().prepare('UPDATE settings SET telegram_enabled = ? WHERE id = 1').run(body.telegramEnabled ? 1 : 0);
+    getDb().prepare('UPDATE settings SET telegram_enabled = ? WHERE org_id = ?').run(body.telegramEnabled ? 1 : 0, orgId);
   }
   if (body.telegramBotUsername !== undefined) {
-    getDb().prepare('UPDATE settings SET telegram_bot_username = ? WHERE id = 1').run(body.telegramBotUsername.replace(/^@/, ''));
+    getDb()
+      .prepare('UPDATE settings SET telegram_bot_username = ? WHERE org_id = ?')
+      .run(body.telegramBotUsername.replace(/^@/, ''), orgId);
   }
   if (body.telegramReminderHours !== undefined) {
-    getDb().prepare('UPDATE settings SET telegram_reminder_hours = ? WHERE id = 1').run(body.telegramReminderHours);
+    getDb().prepare('UPDATE settings SET telegram_reminder_hours = ? WHERE org_id = ?').run(body.telegramReminderHours, orgId);
   }
   if (body.whatsappPhoneNumberId !== undefined) {
-    getDb().prepare('UPDATE settings SET whatsapp_phone_number_id = ? WHERE id = 1').run(body.whatsappPhoneNumberId);
+    getDb().prepare('UPDATE settings SET whatsapp_phone_number_id = ? WHERE org_id = ?').run(body.whatsappPhoneNumberId, orgId);
   }
   if (body.whatsappAccessToken) {
-    getDb().prepare('UPDATE settings SET whatsapp_access_token = ? WHERE id = 1').run(body.whatsappAccessToken);
+    getDb().prepare('UPDATE settings SET whatsapp_access_token = ? WHERE org_id = ?').run(body.whatsappAccessToken, orgId);
   }
   if (body.whatsappBusinessAccountId !== undefined) {
-    getDb().prepare('UPDATE settings SET whatsapp_business_account_id = ? WHERE id = 1').run(body.whatsappBusinessAccountId);
+    getDb().prepare('UPDATE settings SET whatsapp_business_account_id = ? WHERE org_id = ?').run(body.whatsappBusinessAccountId, orgId);
   }
   if (body.whatsappTestRecipient !== undefined) {
-    getDb().prepare('UPDATE settings SET whatsapp_test_recipient = ? WHERE id = 1').run(body.whatsappTestRecipient);
+    getDb().prepare('UPDATE settings SET whatsapp_test_recipient = ? WHERE org_id = ?').run(body.whatsappTestRecipient, orgId);
+  }
+  if (body.whatsappRemindersEnabled !== undefined) {
+    getDb()
+      .prepare('UPDATE settings SET whatsapp_reminders_enabled = ? WHERE org_id = ?')
+      .run(body.whatsappRemindersEnabled ? 1 : 0, orgId);
   }
   void refreshTelegramBot();
   writeAudit(req.user!, 'settings_updated', 'Clinic settings updated');
-  res.json(readSettings());
+  res.json(readSettings(orgId));
 });
 
 clinicRouter.post('/settings/telegram-test', requireRoles('owner'), asyncHandler(async (_req, res) => {
@@ -1427,8 +1565,8 @@ clinicRouter.post('/settings/telegram-test', requireRoles('owner'), asyncHandler
   res.json({ delivered: true });
 }));
 
-clinicRouter.post('/settings/whatsapp-test', requireRoles('owner'), asyncHandler(async (_req, res) => {
-  const result = await sendWhatsAppTest();
+clinicRouter.post('/settings/whatsapp-test', requireRoles('owner'), asyncHandler(async (req, res) => {
+  const result = await sendWhatsAppTest(undefined, requireOrgId(req));
   res.json({ delivered: true, providerMessageId: result.providerMessageId });
 }));
 
@@ -1448,7 +1586,7 @@ clinicRouter.get('/audit', (_req, res) => {
   res.json(
     rows.map((row) => ({
       id: String(row.id),
-      orgId: 'clinic',
+      orgId: oid(),
       userId: row.user_id == null ? 'system' : String(row.user_id),
       userName: row.user_name,
       timestamp: row.created_at,
@@ -1474,7 +1612,7 @@ clinicRouter.post(
     };
     res.status(201).json({
       id: String(row.id),
-      orgId: 'clinic',
+      orgId: oid(),
       userId: String(row.user_id),
       userName: row.user_name,
       timestamp: row.created_at,

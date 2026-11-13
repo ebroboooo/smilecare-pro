@@ -45,6 +45,8 @@ export interface Customer {
   status: 'Active' | 'Inactive';
   totalSpending: number;
   createdAt: string;
+  medicalAlerts?: string;
+  nationalId?: string;
 }
 
 export type ReservationStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'NoShow';
@@ -197,6 +199,7 @@ export interface SystemSettings {
     waitlistEnabled: boolean;
     telegramNotifications: boolean;
     publicBookingEnabled: boolean;
+    whatsappReminders?: boolean;
   };
   telegramChatId?: string;
   telegramEnabled?: boolean;
@@ -208,4 +211,7 @@ export interface SystemSettings {
   whatsappTestRecipient?: string;
   whatsappTokenSet?: boolean;
   whatsappLastStatus?: string;
+  whatsappRemindersEnabled?: boolean;
+  consentVersion?: string;
+  complianceCertified?: boolean;
 }

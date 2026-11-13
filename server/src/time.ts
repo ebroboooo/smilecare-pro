@@ -19,7 +19,7 @@ export function utcToLocal(iso: string, zone: string): { date: string; time: str
 }
 
 export function getClinicZone(): string {
-  const row = getDb().prepare('SELECT timezone FROM settings WHERE id = 1').get() as { timezone: string } | undefined;
+  const row = getDb().prepare('SELECT timezone FROM settings WHERE org_id = 1').get() as { timezone: string } | undefined;
   return row?.timezone || 'Africa/Cairo';
 }
 

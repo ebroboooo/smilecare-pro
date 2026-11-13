@@ -19,7 +19,6 @@ import {
   revokeSession,
   setSessionCookie,
   verifyPassword,
-  type Role,
 } from '../auth.js';
 import { getDb } from '../db.js';
 import { asyncHandler, HttpError, validate } from '../http.js';
@@ -117,18 +116,21 @@ authRouter.post(
     const create = getDb().transaction(() => {
       const info = getDb()
         .prepare(
-          `INSERT INTO users (email, password_hash, name, role, is_active, must_change_password, created_at, updated_at)
-           VALUES (?, ?, ?, 'owner', 1, 0, ?, ?)`,
+          `INSERT INTO users (email, password_hash, name, role, org_id, is_active, must_change_password, created_at, updated_at)
+           VALUES (?, ?, ?, 'owner', 1, 1, 0, ?, ?)`,
         )
         .run(body.email, passwordHash, body.name, now, now);
       getDb()
-        .prepare(`UPDATE settings SET business_name = ?, updated_at = ? WHERE id = 1`)
+        .prepare(`UPDATE settings SET business_name = ?, updated_at = ? WHERE org_id = 1`)
+        .run(body.businessName, now);
+      getDb()
+        .prepare(`UPDATE organizations SET name = ?, updated_at = ? WHERE id = 1`)
         .run(body.businessName, now);
       return Number(info.lastInsertRowid);
     });
     const userId = create();
     const row = findUserByEmail(body.email)!;
-    writeAudit({ id: userId, name: body.name }, 'setup', 'Clinic owner account created');
+    writeAudit({ id: userId, name: body.name, orgId: 1 }, 'setup', 'Clinic owner account created');
     const session = createSession(userId);
     setSessionCookie(res, session.token);
     res.status(201).json({ user: publicUser(mapUser(row)) });
@@ -157,18 +159,8 @@ authRouter.post(
     clearFailedLogin(user.id);
     const session = createSession(user.id);
     setSessionCookie(res, session.token);
-    writeAudit({ id: user.id, name: user.name }, 'login', 'Staff signed in');
-    const mapped = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role as Role,
-      branchId: user.branch_id,
-      doctorId: user.doctor_id,
-      isActive: true,
-      mustChangePassword: user.must_change_password === 1,
-    };
-    res.json({ user: publicUser(mapped) });
+    writeAudit({ id: user.id, name: user.name, orgId: user.org_id || 1 }, 'login', 'Staff signed in');
+    res.json({ user: publicUser(mapUser(user)) });
   }),
 );
 
@@ -210,36 +202,15 @@ authRouter.post(
   }),
 );
 
-authRouter.get('/users', requireAuth, requireRoles('owner'), (_req, res) => {
+authRouter.get('/users', requireAuth, requireRoles('owner'), (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT id, email, name, role, branch_id, doctor_id, is_active, must_change_password
-       FROM users ORDER BY id`,
+      `SELECT id, email, password_hash, name, role, org_id, branch_id, doctor_id, is_active, must_change_password,
+              failed_login_count, locked_until
+       FROM users WHERE org_id = ? ORDER BY id`,
     )
-    .all() as Array<{
-    id: number;
-    email: string;
-    name: string;
-    role: Role;
-    branch_id: number | null;
-    doctor_id: number | null;
-    is_active: number;
-    must_change_password: number;
-  }>;
-  res.json(
-    rows.map((row) =>
-      publicUser({
-        id: row.id,
-        email: row.email,
-        name: row.name,
-        role: row.role,
-        branchId: row.branch_id,
-        doctorId: row.doctor_id,
-        isActive: row.is_active === 1,
-        mustChangePassword: row.must_change_password === 1,
-      }),
-    ),
-  );
+    .all(req.user!.orgId);
+  res.json(rows.map((row) => publicUser(mapUser(row as Parameters<typeof mapUser>[0]))));
 });
 
 authRouter.post(
@@ -252,16 +223,17 @@ authRouter.post(
     const now = new Date().toISOString();
     const passwordHash = await hashPassword(body.password);
     try {
-      const info = getDb()
+      getDb()
         .prepare(
-          `INSERT INTO users (email, password_hash, name, role, branch_id, doctor_id, is_active, must_change_password, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`,
+          `INSERT INTO users (email, password_hash, name, role, org_id, branch_id, doctor_id, is_active, must_change_password, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)`,
         )
         .run(
           body.email,
           passwordHash,
           body.name,
           body.role,
+          req.user!.orgId,
           body.branchId ? Number(body.branchId) : null,
           body.doctorId ? Number(body.doctorId) : null,
           now,
@@ -269,18 +241,7 @@ authRouter.post(
         );
       writeAudit(req.user!, 'user_created', `Created staff account role ${body.role}`);
       const created = findUserByEmail(body.email)!;
-      res.status(201).json({
-        user: publicUser({
-          id: Number(info.lastInsertRowid),
-          email: created.email,
-          name: created.name,
-          role: created.role,
-          branchId: created.branch_id,
-          doctorId: created.doctor_id,
-          isActive: true,
-          mustChangePassword: true,
-        }),
-      });
+      res.status(201).json({ user: publicUser(mapUser(created)) });
     } catch (error) {
       if (String(error).includes('UNIQUE')) throw new HttpError(409, 'CONFLICT', 'An account with that email already exists');
       throw error;

@@ -62,3 +62,18 @@
 - `GET /api/settings` still returns branding and booking rules to every signed-in role. Telegram and WhatsApp connection fields are returned only to the owner.
 - Calendar appointment dialog strings (save, cancel booking, payment status) use the translation tables for Arabic and English.
 - `npm audit fix` (no `--force`) reduced open advisories to one High: `zod` (upgrade to v4 is breaking and was deferred). The previous Critical tinypool/vitest and most High toolchain items were cleared by the safe fix.
+
+## 2026-11-13 — Phase 6 start (Egypt SaaS foundation)
+
+- Multi-clinic tenancy begins with an `organizations` table and `org_id` on clinic data. Staff `orgId` is no longer the hard-coded string `clinic`.
+- New clinics can be created with `POST /api/platform/organizations` when `PLATFORM_SETUP_KEY` is set (16+ chars). `GET /api/platform/status` reports `egypt_pdpl_ready` and **`certified: false`** — software does not self-certify.
+- Egypt PDPL scaffolding: `consent_version`, retention defaults, `patient_access_logs`, medical alerts / national id on patients, empty `treatment_plans` and `invoices` tables for the next slices.
+- Patient WhatsApp reminders are real when `whatsapp_reminders_enabled` is on; kind `whatsapp_upcoming` is claimed once. Meta template approval remains an ops requirement for production.
+- This phase is the foundation for a commercial Egypt clinic suite / multi-clinic SaaS. It is not finished productization, legal certification, or full tenant isolation on every route.
+
+## 2026-11-13 — Phase 6b
+
+- Staff doctors, services, leads, waitlist and public booking/leads are org-scoped. Public booking resolves clinic by `slug` (defaults to org 1).
+- Treatment plans and EGP invoices APIs landed (`/api/patients/:id/treatment-plans`, `/api/invoices`). Invoice lines are not a separate table yet; totals are stored on the invoice row.
+- Medical alerts show on the patient profile and can be set when registering a patient.
+- Still not a compliance certificate, Paymob/Fawry, SMS, or polished multi-tenant staff UI for switching clinics.

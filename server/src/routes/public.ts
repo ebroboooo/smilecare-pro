@@ -29,6 +29,36 @@ function newManageToken(): string {
   return randomBytes(24).toString('hex');
 }
 
+interface PublicSettings {
+  org_id: number;
+  business_name: string;
+  public_slug: string;
+  address: string;
+  phone: string;
+  email: string;
+  currency: string;
+  language: string;
+  is_rtl: number;
+  timezone: string;
+  features_json: string;
+}
+
+function resolveSettings(slug?: string): PublicSettings {
+  const row = (
+    slug
+      ? getDb().prepare(
+          `SELECT org_id, business_name, public_slug, address, phone, email, currency, language, is_rtl, timezone, features_json
+           FROM settings WHERE public_slug = ?`,
+        ).get(slug)
+      : getDb().prepare(
+          `SELECT org_id, business_name, public_slug, address, phone, email, currency, language, is_rtl, timezone, features_json
+           FROM settings WHERE org_id = 1`,
+        ).get()
+  ) as PublicSettings | undefined;
+  if (!row) throw new HttpError(404, 'NOT_FOUND', 'Clinic not found');
+  return row;
+}
+
 const bookBody = z.object({
   companyWebsite: z.string().max(200).optional().default(''),
   fullName: z.string().trim().min(1).max(200),
@@ -41,6 +71,7 @@ const bookBody = z.object({
   time: z.string().regex(/^\d{2}:\d{2}$/),
   notes: z.string().max(2000).optional().default(''),
   consent: z.literal(true),
+  slug: z.string().trim().min(2).max(80).optional(),
 });
 
 const leadBody = z.object({
@@ -50,29 +81,21 @@ const leadBody = z.object({
   email: z.string().trim().email().max(200),
   message: z.string().max(2000).optional().default(''),
   branchId: z.string().regex(/^\d+$/).optional(),
+  slug: z.string().trim().min(2).max(80).optional(),
 });
 
 export const publicRouter = Router();
 publicRouter.use(publicLimiter);
 
-publicRouter.get('/clinic', (_req, res) => {
-  const settings = getDb().prepare(
-    `SELECT business_name, public_slug, address, phone, email, currency, language, is_rtl, timezone, features_json FROM settings WHERE id = 1`,
-  ).get() as {
-    business_name: string;
-    public_slug: string;
-    address: string;
-    phone: string;
-    email: string;
-    currency: string;
-    language: string;
-    is_rtl: number;
-    timezone: string;
-    features_json: string;
-  };
+publicRouter.get('/clinic', (req, res) => {
+  const slug = typeof req.query.slug === 'string' ? req.query.slug : undefined;
+  const settings = resolveSettings(slug);
   const features = JSON.parse(settings.features_json) as { publicBookingEnabled?: boolean };
-  const branches = getDb().prepare(`SELECT id, name, address, phone, timezone FROM branches WHERE is_active = 1 ORDER BY id`).all();
+  const branches = getDb()
+    .prepare(`SELECT id, name, address, phone, timezone FROM branches WHERE is_active = 1 AND org_id = ? ORDER BY id`)
+    .all(settings.org_id);
   res.json({
+    orgId: String(settings.org_id),
     businessName: settings.business_name,
     publicSlug: settings.public_slug,
     address: settings.address,
@@ -83,37 +106,47 @@ publicRouter.get('/clinic', (_req, res) => {
     isRtl: settings.is_rtl === 1,
     timezone: settings.timezone,
     publicBookingEnabled: features.publicBookingEnabled !== false,
+    consentVersion: 'eg-pdpl-2026.1',
     branches,
   });
 });
 
 publicRouter.get('/services', (req, res) => {
+  const slug = typeof req.query.slug === 'string' ? req.query.slug : undefined;
+  const settings = resolveSettings(slug);
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : '';
   const rows = getDb().prepare(
     `SELECT s.id, s.name, s.description, s.duration, s.price, s.category
      FROM services s
      JOIN service_branches sb ON sb.service_id = s.id
-     WHERE s.deleted_at IS NULL AND s.status = 'Active' AND (? = '' OR sb.branch_id = ?)
+     JOIN branches b ON b.id = sb.branch_id AND b.org_id = s.org_id
+     WHERE s.deleted_at IS NULL AND s.status = 'Active' AND s.org_id = ?
+       AND (? = '' OR sb.branch_id = ?)
      GROUP BY s.id
      ORDER BY s.name`,
-  ).all(branchId, branchId ? Number(branchId) : 0);
+  ).all(settings.org_id, branchId, branchId ? Number(branchId) : 0);
   res.json(rows);
 });
 
 publicRouter.get('/doctors', (req, res) => {
+  const slug = typeof req.query.slug === 'string' ? req.query.slug : undefined;
+  const settings = resolveSettings(slug);
   const branchId = typeof req.query.branchId === 'string' ? req.query.branchId : '';
   const rows = getDb().prepare(
     `SELECT d.id, d.name, d.role
      FROM doctors d
      JOIN doctor_branches dbn ON dbn.doctor_id = d.id
-     WHERE d.deleted_at IS NULL AND d.status = 'Active' AND (? = '' OR dbn.branch_id = ?)
+     WHERE d.deleted_at IS NULL AND d.status = 'Active' AND d.org_id = ?
+       AND (? = '' OR dbn.branch_id = ?)
      GROUP BY d.id
      ORDER BY d.name`,
-  ).all(branchId, branchId ? Number(branchId) : 0);
+  ).all(settings.org_id, branchId, branchId ? Number(branchId) : 0);
   res.json(rows);
 });
 
 publicRouter.get('/slots', (req, res) => {
+  const slug = typeof req.query.slug === 'string' ? req.query.slug : undefined;
+  const settings = resolveSettings(slug);
   const doctorId = Number(req.query.doctorId);
   const serviceId = Number(req.query.serviceId);
   const branchId = Number(req.query.branchId);
@@ -121,7 +154,9 @@ publicRouter.get('/slots', (req, res) => {
   if (!doctorId || !serviceId || !branchId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     throw new HttpError(400, 'VALIDATION', 'doctorId, serviceId, branchId, and date are required');
   }
-  const service = getDb().prepare(`SELECT duration FROM services WHERE id = ? AND deleted_at IS NULL AND status = 'Active'`).get(serviceId) as { duration: number } | undefined;
+  const service = getDb().prepare(
+    `SELECT duration FROM services WHERE id = ? AND org_id = ? AND deleted_at IS NULL AND status = 'Active'`,
+  ).get(serviceId, settings.org_id) as { duration: number } | undefined;
   if (!service) throw new HttpError(404, 'NOT_FOUND', 'Service not found');
   res.json({ slots: slotsForDoctor({ doctorId, branchId, date, duration: service.duration, enforceNotice: true }) });
 });
@@ -132,11 +167,16 @@ publicRouter.post('/bookings', (req, res) => {
     res.status(201).json({ reference: 'RECEIVED', manageToken: '' });
     return;
   }
-  const features = JSON.parse((getDb().prepare('SELECT features_json FROM settings WHERE id = 1').get() as { features_json: string }).features_json) as { publicBookingEnabled?: boolean };
+  const settings = resolveSettings(body.slug);
+  const features = JSON.parse(settings.features_json) as { publicBookingEnabled?: boolean };
   if (features.publicBookingEnabled === false) throw new HttpError(403, 'CLOSED', 'Online booking is turned off');
-  const service = getDb().prepare(`SELECT duration, price, name FROM services WHERE id = ? AND deleted_at IS NULL`).get(Number(body.serviceId)) as
-    | { duration: number; price: number; name: string }
-    | undefined;
+  const branch = getDb()
+    .prepare(`SELECT id FROM branches WHERE id = ? AND org_id = ? AND is_active = 1`)
+    .get(Number(body.branchId), settings.org_id);
+  if (!branch) throw new HttpError(400, 'VALIDATION', 'Choose a clinic location');
+  const service = getDb().prepare(
+    `SELECT duration, price, name FROM services WHERE id = ? AND org_id = ? AND deleted_at IS NULL`,
+  ).get(Number(body.serviceId), settings.org_id) as { duration: number; price: number; name: string } | undefined;
   if (!service) throw new HttpError(400, 'VALIDATION', 'Choose a service');
   const token = newManageToken();
   const now = new Date().toISOString();
@@ -149,12 +189,17 @@ publicRouter.post('/bookings', (req, res) => {
       duration: service.duration,
       enforceNotice: true,
     });
-    const existingPatient = getDb().prepare(`SELECT id FROM patients WHERE phone = ? AND deleted_at IS NULL ORDER BY id LIMIT 1`).get(body.phone) as { id: number } | undefined;
+    const existingPatient = getDb()
+      .prepare(`SELECT id FROM patients WHERE phone = ? AND org_id = ? AND deleted_at IS NULL ORDER BY id LIMIT 1`)
+      .get(body.phone, settings.org_id) as { id: number } | undefined;
     let patientId = existingPatient?.id;
     if (!patientId) {
       const info = getDb()
-        .prepare(`INSERT INTO patients (full_name, phone, email, notes, tags, status, total_spending, created_at) VALUES (?, ?, ?, '', '["Portal"]', 'Active', 0, ?)`)
-        .run(body.fullName, body.phone, body.email, now);
+        .prepare(
+          `INSERT INTO patients (full_name, phone, email, notes, tags, status, total_spending, created_at, org_id)
+           VALUES (?, ?, ?, '', '["Portal"]', 'Active', 0, ?, ?)`,
+        )
+        .run(body.fullName, body.phone, body.email, now, settings.org_id);
       patientId = Number(info.lastInsertRowid);
     }
     const start = localToUtc(body.date, body.time, getClinicZone());
@@ -163,8 +208,8 @@ publicRouter.post('/bookings', (req, res) => {
       .prepare(
         `INSERT INTO appointments (
           branch_id, patient_id, service_id, doctor_id, starts_at, ends_at, duration_min, notes, status,
-          payment_status, payment_method, payment_amount, booking_ref, manage_token_hash, source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Unpaid', 'Cash', ?, ?, ?, 'public', ?, ?)`,
+          payment_status, payment_method, payment_amount, booking_ref, manage_token_hash, source, created_at, updated_at, org_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Unpaid', 'Cash', ?, ?, ?, 'public', ?, ?, ?)`,
       )
       .run(
         Number(body.branchId),
@@ -180,10 +225,14 @@ publicRouter.post('/bookings', (req, res) => {
         sha256(token),
         now,
         now,
+        settings.org_id,
       );
     getDb()
-      .prepare(`INSERT INTO notifications (branch_id, title, message, read, type, created_at) VALUES (?, ?, ?, 0, 'BookingCreated', ?)`)
-      .run(Number(body.branchId), 'New booking request', `${body.fullName} requested ${service.name}.`, now);
+      .prepare(
+        `INSERT INTO notifications (branch_id, title, message, read, type, created_at, org_id)
+         VALUES (?, ?, ?, 0, 'BookingCreated', ?, ?)`,
+      )
+      .run(Number(body.branchId), 'New booking request', `${body.fullName} requested ${service.name}.`, now, settings.org_id);
     return { id: Number(info.lastInsertRowid), reference };
   });
   const created = create.immediate();
@@ -271,18 +320,24 @@ publicRouter.post('/leads', (req, res) => {
     res.status(201).json({ ok: true });
     return;
   }
+  const settings = resolveSettings(body.slug);
   const branch = body.branchId
     ? Number(body.branchId)
-    : (getDb().prepare('SELECT id FROM branches ORDER BY id LIMIT 1').get() as { id: number }).id;
+    : (getDb().prepare('SELECT id FROM branches WHERE org_id = ? ORDER BY id LIMIT 1').get(settings.org_id) as { id: number }).id;
+  const owned = getDb().prepare(`SELECT id FROM branches WHERE id = ? AND org_id = ?`).get(branch, settings.org_id);
+  if (!owned) throw new HttpError(400, 'VALIDATION', 'Choose a clinic location');
   const now = new Date().toISOString();
   getDb()
     .prepare(
-      `INSERT INTO leads (branch_id, full_name, phone, email, source, status, value, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'Website', 'New', 0, ?, ?, ?)`,
+      `INSERT INTO leads (branch_id, full_name, phone, email, source, status, value, notes, created_at, updated_at, org_id)
+       VALUES (?, ?, ?, ?, 'Website', 'New', 0, ?, ?, ?, ?)`,
     )
-    .run(branch, body.fullName, body.phone, body.email, body.message, now, now);
+    .run(branch, body.fullName, body.phone, body.email, body.message, now, now, settings.org_id);
   getDb()
-    .prepare(`INSERT INTO notifications (branch_id, title, message, read, type, created_at) VALUES (?, 'New inquiry', ?, 0, 'LeadCreated', ?)`)
-    .run(branch, `${body.fullName} sent a message from the website.`, now);
+    .prepare(
+      `INSERT INTO notifications (branch_id, title, message, read, type, created_at, org_id)
+       VALUES (?, 'New inquiry', ?, 0, 'LeadCreated', ?, ?)`,
+    )
+    .run(branch, `${body.fullName} sent a message from the website.`, now, settings.org_id);
   res.status(201).json({ ok: true });
 });

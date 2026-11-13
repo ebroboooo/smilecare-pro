@@ -4,7 +4,10 @@ import { canTransition } from './availability.js';
 import { getDb } from './db.js';
 import { HttpError } from './http.js';
 import { logger } from './logger.js';
+import { claimReminder } from './reminders.js';
 import { getClinicZone, utcToLocal } from './time.js';
+
+export { claimReminder } from './reminders.js';
 
 let bot: Bot | null = null;
 let activeToken = '';
@@ -25,7 +28,7 @@ function sha256(value: string): string {
 export function readTelegramConfig(): TelegramConfig {
   const row = getDb().prepare(
     `SELECT telegram_bot_token, telegram_chat_id, telegram_enabled, telegram_bot_username, telegram_reminder_hours
-     FROM settings WHERE id = 1`,
+     FROM settings WHERE org_id = 1`,
   ).get() as {
     telegram_bot_token: string | null;
     telegram_chat_id: string | null;
@@ -41,13 +44,6 @@ export function readTelegramConfig(): TelegramConfig {
     username: (row.telegram_bot_username || '').replace(/^@/, ''),
     reminderHours: Number.isFinite(hours) ? Math.min(72, Math.max(1, hours)) : 24,
   };
-}
-
-export function claimReminder(appointmentId: number, kind: string, scheduledFor: string): boolean {
-  const info = getDb()
-    .prepare(`INSERT INTO reminders (appointment_id, kind, scheduled_for, status) VALUES (?, ?, ?, 'pending') ON CONFLICT(appointment_id, kind) DO NOTHING`)
-    .run(appointmentId, kind, scheduledFor);
-  return info.changes === 1;
 }
 
 function reminderStatus(appointmentId: number, kind: string): string | undefined {

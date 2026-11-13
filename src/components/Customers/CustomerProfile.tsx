@@ -85,7 +85,13 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
+      {customer.medicalAlerts?.trim() && (
+        <div className="rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
+          <span className="font-bold">{t.medicalAlerts}: </span>
+          {customer.medicalAlerts}
+        </div>
+      )}
+
       {/* Profile Overview Card */}
       <div className="card p-6 rounded-3xl border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-center gap-5 z-10">

@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { deliverWhatsApp, type WhatsAppConfig } from '../src/whatsapp.js';
 
 const config: WhatsAppConfig = {
+  orgId: 1,
   phoneNumberId: '123456789012345',
   token: 'a-long-token-value-not-real',
   businessAccountId: '',
   testRecipient: '201012345678',
   lastStatus: '',
+  remindersEnabled: false,
+  reminderHours: 24,
 };
 
 describe('WhatsApp delivery is not invented', () => {

@@ -14,6 +14,8 @@
     "typecheck": "tsc -b --pretty false && npm run typecheck -w smilecare-server",
     "lint": "oxlint",
     "test": "npm run test -w smilecare-server",
+    "verify": "powershell -NoProfile -File scripts/verify.ps1",
+    "setup:test-env": "powershell -NoProfile -File scripts/setup-test-env.ps1",
     "preview": "vite preview",
     "seed:demo": "npm run seed:demo -w smilecare-server",
     "start": "npm run start -w smilecare-server"

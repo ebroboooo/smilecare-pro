@@ -26,7 +26,7 @@ if (patientCount > 0) {
 
   const seed = db.transaction(() => {
     db.prepare(
-      `UPDATE settings SET business_name = ?, public_slug = ?, address = ?, phone = ?, email = ?, currency = ?, timezone = ?, updated_at = ? WHERE id = 1`,
+      `UPDATE settings SET business_name = ?, public_slug = ?, address = ?, phone = ?, email = ?, currency = ?, timezone = ?, updated_at = ? WHERE org_id = 1`,
     ).run('SmileCare Dental Clinic', 'smilecare-clinic', '12 Nile Corniche', '+20 2 0000 0000', 'hello@smilecare.example', 'EGP', zone, now);
 
     db.prepare(`UPDATE branches SET name = ?, address = ?, phone = ?, email = ?, timezone = ? WHERE id = ?`).run(

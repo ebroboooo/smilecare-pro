@@ -4,6 +4,7 @@ import { requireAuth, requireRoles } from '../auth.js';
 import { getDb } from '../db.js';
 import { writeAudit } from '../audit.js';
 import { HttpError, asyncHandler, parseId } from '../http.js';
+import { requireOrgId } from '../org.js';
 
 const staffWrite = requireRoles('owner', 'receptionist');
 const toothSchema = z.string().regex(/^[1-4][1-8]$/);
@@ -35,8 +36,10 @@ const paymentBody = z.object({
   paidAt: z.string().datetime().optional(),
 });
 
-function requirePatient(id: number) {
-  const row = getDb().prepare('SELECT id FROM patients WHERE id = ? AND deleted_at IS NULL').get(id);
+function requirePatient(id: number, orgId: number) {
+  const row = getDb()
+    .prepare('SELECT id FROM patients WHERE id = ? AND org_id = ? AND deleted_at IS NULL')
+    .get(id, orgId);
   if (!row) throw new HttpError(404, 'NOT_FOUND', 'Patient not found');
 }
 
@@ -45,14 +48,14 @@ dentalRouter.use(requireAuth);
 
 dentalRouter.get('/patients/:id/odontogram', (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   const rows = getDb().prepare('SELECT tooth, condition, note, updated_at FROM tooth_findings WHERE patient_id = ? ORDER BY tooth').all(id);
   res.json({ teeth: rows });
 });
 
 dentalRouter.put('/patients/:id/odontogram', asyncHandler(async (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   const body = chartBody.parse(req.body);
   const now = new Date().toISOString();
   const save = getDb().transaction(() => {
@@ -71,7 +74,7 @@ dentalRouter.put('/patients/:id/odontogram', asyncHandler(async (req, res) => {
 
 dentalRouter.get('/patients/:id/visits', (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   const rows = getDb().prepare(
     `SELECT v.*, d.name AS doctor_name FROM visits v
      LEFT JOIN doctors d ON d.id = v.doctor_id
@@ -93,7 +96,7 @@ dentalRouter.get('/patients/:id/visits', (req, res) => {
 
 dentalRouter.post('/patients/:id/visits', (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   const body = visitBody.parse(req.body);
   const info = getDb().prepare(
     `INSERT INTO visits (patient_id, appointment_id, doctor_id, visited_on, complaint, diagnosis, treatment, notes, created_at)
@@ -124,13 +127,13 @@ function balanceFor(patientId: number) {
 
 dentalRouter.get('/patients/:id/balance', (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   res.json(balanceFor(id));
 });
 
 dentalRouter.get('/patients/:id/payments', (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   const rows = getDb().prepare('SELECT * FROM payments WHERE patient_id = ? ORDER BY paid_at DESC, id DESC').all(id) as Array<{
     id: number; amount: number; method: string; note: string; paid_at: string; appointment_id: number | null;
   }>;
@@ -149,7 +152,7 @@ dentalRouter.get('/patients/:id/payments', (req, res) => {
 
 dentalRouter.post('/patients/:id/payments', staffWrite, (req, res) => {
   const id = parseId(req.params.id, 'Patient');
-  requirePatient(id);
+  requirePatient(id, requireOrgId(req));
   const body = paymentBody.parse(req.body);
   const paidAt = body.paidAt || new Date().toISOString();
   const info = getDb().prepare(

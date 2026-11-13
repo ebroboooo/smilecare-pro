@@ -13,6 +13,8 @@ import { publicRouter } from './routes/public.js';
 import { clinicRouter } from './routes/resources.js';
 import { dentalRouter } from './routes/dental.js';
 import { privacyRouter } from './routes/privacy.js';
+import { platformRouter } from './routes/platform.js';
+import { clinicalRouter } from './routes/clinical.js';
 
 export function createApp() {
   const config = loadConfig();
@@ -49,9 +51,11 @@ export function createApp() {
     res.json({ ok: true });
   });
   app.use('/api', authRouter);
+  app.use('/api', platformRouter);
   app.use('/api/public', publicRouter);
   app.use('/api', clinicRouter);
   app.use('/api', dentalRouter);
+  app.use('/api', clinicalRouter);
   app.use('/api', privacyRouter);
 
   if (process.env.NODE_ENV === 'production') {

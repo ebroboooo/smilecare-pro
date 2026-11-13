@@ -23,7 +23,15 @@ export const Settings: React.FC = () => {
 
   const [telegram, setTelegram] = useState({ chatId: '', enabled: false, token: '', tokenSet: false, username: '', reminderHours: 24 });
   const [telegramError, setTelegramError] = useState('');
-  const [whatsapp, setWhatsapp] = useState({ phoneNumberId: '', businessAccountId: '', testRecipient: '', token: '', tokenSet: false, lastStatus: '' });
+  const [whatsapp, setWhatsapp] = useState({
+    phoneNumberId: '',
+    businessAccountId: '',
+    testRecipient: '',
+    token: '',
+    tokenSet: false,
+    lastStatus: '',
+    remindersEnabled: false,
+  });
   const [whatsappError, setWhatsappError] = useState('');
   const [confirmFreshStart, setConfirmFreshStart] = useState(false);
   const [confirmDemoLoad, setConfirmDemoLoad] = useState(false);
@@ -74,6 +82,7 @@ export const Settings: React.FC = () => {
         token: current.token,
         tokenSet: settings.whatsappTokenSet === true,
         lastStatus: settings.whatsappLastStatus || '',
+        remindersEnabled: settings.whatsappRemindersEnabled === true,
       }));
     }
   }, [settings]);
@@ -419,6 +428,7 @@ export const Settings: React.FC = () => {
                       whatsappPhoneNumberId: whatsapp.phoneNumberId,
                       whatsappBusinessAccountId: whatsapp.businessAccountId,
                       whatsappTestRecipient: whatsapp.testRecipient,
+                      whatsappRemindersEnabled: whatsapp.remindersEnabled,
                       ...(whatsapp.token ? { whatsappAccessToken: whatsapp.token } : {}),
                     }),
                   });
@@ -432,10 +442,17 @@ export const Settings: React.FC = () => {
             >
               <div className="flex items-center gap-2">
                 <h4 className="font-bold text-slate-900 text-sm">{t.whatsappTitle}</h4>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">{t.whatsappComingSoon}</span>
               </div>
               <p className="text-sm text-slate-700">{t.whatsappPatientNote}</p>
               <p className="text-xs text-slate-500">{t.whatsappHelp}</p>
+              <label className="flex items-center gap-2 text-sm text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={whatsapp.remindersEnabled}
+                  onChange={(event) => setWhatsapp({ ...whatsapp, remindersEnabled: event.target.checked })}
+                />
+                {t.whatsappRemindersEnabled}
+              </label>
               <label className="block text-sm font-medium text-slate-700">{t.phoneNumberId}</label>
               <input className="input-field text-sm" inputMode="numeric" value={whatsapp.phoneNumberId} onChange={(event) => setWhatsapp({ ...whatsapp, phoneNumberId: event.target.value })} />
               <label className="block text-sm font-medium text-slate-700">{t.businessAccountId}</label>
