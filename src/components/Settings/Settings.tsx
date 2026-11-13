@@ -415,6 +415,14 @@ export const Settings: React.FC = () => {
             </form>
           )}
 
+          {DEMO_MODE && (
+            <div className="space-y-2 border-t border-slate-200 pt-4">
+              <h4 className="font-bold text-slate-900 text-sm">{t.whatsappTitle}</h4>
+              <p className="text-sm text-slate-700">{t.whatsappConfirmHint}</p>
+              <p className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">{t.whatsappBookingConfirmNote}</p>
+            </div>
+          )}
+
           {!DEMO_MODE && (
             <form
               className="space-y-3 border-t border-slate-200 pt-4"
@@ -445,6 +453,7 @@ export const Settings: React.FC = () => {
               </div>
               <p className="text-sm text-slate-700">{t.whatsappPatientNote}</p>
               <p className="text-xs text-slate-500">{t.whatsappHelp}</p>
+              <p className="text-xs text-slate-600 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">{t.whatsappBookingConfirmNote}</p>
               <label className="flex items-center gap-2 text-sm text-slate-800">
                 <input
                   type="checkbox"

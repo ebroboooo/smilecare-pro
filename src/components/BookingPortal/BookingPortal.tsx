@@ -10,6 +10,7 @@ import { PublicBooking } from './PublicBooking';
 import {
   getAvailableSlots, validateBookingForm, isPastDate, type BookingFormErrors
 } from '../../utils/bookingValidation';
+import { openBookingWhatsApp } from '../../utils/whatsappConfirm';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import {
   Building, Briefcase, Stethoscope, Calendar as CalIcon,
@@ -153,6 +154,17 @@ const DemoBookingPortal: React.FC = () => {
       title: 'New Patient Appointment',
       message: `${clientName} booked ${activeService?.name} on ${selDate} at ${selTime}.`,
       read: false, type: 'BookingCreated'
+    });
+
+    openBookingWhatsApp(clientPhone, {
+      businessName: settings?.businessName || 'SmileCare Dental Clinic',
+      patientName: clientName,
+      serviceName: activeService?.name || 'Appointment',
+      doctorName: activeEmployee?.name || 'Doctor',
+      branchName: activeBranch?.name,
+      date: selDate,
+      time: selTime,
+      reference: booking.id,
     });
 
     setReceiptNumber(booking.id);
@@ -336,6 +348,23 @@ const DemoBookingPortal: React.FC = () => {
                 <div className="flex justify-between"><span className="text-slate-500">Doctor</span><span>{activeEmployee?.name}</span></div>
                 <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-500">Payment</span><span className="font-semibold text-emerald-600">Pay at Clinic</span></div>
               </div>
+              <p className="text-sm text-slate-600 max-w-sm mx-auto">WhatsApp opens with this confirmation so the patient can receive the booking details.</p>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => openBookingWhatsApp(clientPhone, {
+                  businessName: settings?.businessName || 'SmileCare Dental Clinic',
+                  patientName: clientName,
+                  serviceName: activeService?.name || 'Appointment',
+                  doctorName: activeEmployee?.name || 'Doctor',
+                  branchName: activeBranch?.name,
+                  date: selDate,
+                  time: selTime,
+                  reference: receiptNumber,
+                })}
+              >
+                Open WhatsApp confirmation
+              </button>
               <button onClick={() => { setStep(1); setErrors({}); }} className="btn-secondary">Book Another Appointment</button>
             </div>
           )}

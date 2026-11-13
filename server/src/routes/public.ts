@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { assertSlotAvailable, readBookingRules, slotsForDoctor } from '../availability.js';
 import { newBookingRef } from '../auth.js';
 import { queueAppointmentAlert } from '../telegram.js';
+import { queueBookingWhatsAppConfirmation } from '../whatsapp.js';
 import { getDb } from '../db.js';
 import { HttpError } from '../http.js';
 import { getClinicZone, localToUtc, utcToLocal } from '../time.js';
@@ -237,7 +238,12 @@ publicRouter.post('/bookings', (req, res) => {
   });
   const created = create.immediate();
   queueAppointmentAlert(created.id);
-  res.status(201).json({ reference: created.reference, manageToken: token });
+  queueBookingWhatsAppConfirmation(created.id);
+  res.status(201).json({
+    reference: created.reference,
+    manageToken: token,
+    whatsappConfirmationQueued: true,
+  });
 });
 
 function loadByToken(reference: string, token: string) {

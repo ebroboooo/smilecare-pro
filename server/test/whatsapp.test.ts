@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deliverWhatsApp, type WhatsAppConfig } from '../src/whatsapp.js';
+import { buildBookingConfirmationBody, deliverWhatsApp, type WhatsAppConfig } from '../src/whatsapp.js';
 
 const config: WhatsAppConfig = {
   orgId: 1,
@@ -44,5 +44,27 @@ describe('WhatsApp delivery is not invented', () => {
         throw new Error('offline');
       },
     })).rejects.toThrow(/could not be reached/);
+  });
+});
+
+describe('WhatsApp booking confirmation text', () => {
+  it('includes reservation details for the patient', () => {
+    const body = buildBookingConfirmationBody({
+      businessName: 'SmileCare Dental Clinic',
+      patientName: 'Sara',
+      serviceName: 'Dental Cleaning',
+      doctorName: 'Dr. Nabil',
+      branchName: 'Zamalek',
+      date: '2026-11-16',
+      time: '10:00',
+      reference: 'SC-ABC123',
+    });
+    expect(body).toContain('SmileCare Dental Clinic');
+    expect(body).toContain('Sara');
+    expect(body).toContain('Dental Cleaning');
+    expect(body).toContain('Dr. Nabil');
+    expect(body).toContain('Zamalek');
+    expect(body).toContain('2026-11-16 at 10:00');
+    expect(body).toContain('SC-ABC123');
   });
 });

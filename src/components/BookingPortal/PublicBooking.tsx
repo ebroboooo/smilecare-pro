@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { translations, type Language } from '../../utils/translations';
 import { formatMoney } from '../../utils/locale';
 import { applyDocumentLanguage, readPublicLanguage, writePublicLanguage } from '../../utils/publicLanguage';
+import { openBookingWhatsApp } from '../../utils/whatsappConfirm';
 import { LanguageSwitch } from '../ui/LanguageSwitch';
 
 interface PublicClinic {
@@ -67,10 +68,14 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
   const [reference, setReference] = useState(params.get('ref') || '');
   const [manageToken, setManageToken] = useState(params.get('token') || '');
   const [bookingStatus, setBookingStatus] = useState('');
+  const [whatsappQueued, setWhatsappQueued] = useState(false);
   const [moveDate, setMoveDate] = useState(dateKey(1));
   const [moveTime, setMoveTime] = useState('10:00');
 
   const copy = translations[lang];
+  const service = services.find((item) => String(item.id) === serviceId);
+  const doctor = doctors.find((item) => String(item.id) === doctorId);
+  const branch = clinic?.branches.find((item) => String(item.id) === branchId);
 
   useEffect(() => {
     applyDocumentLanguage(lang);
@@ -145,9 +150,6 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
 
   if (clinic.publicSlug !== slug) return <BusinessNotFound slug={slug} />;
 
-  const service = services.find((item) => String(item.id) === serviceId);
-  const doctor = doctors.find((item) => String(item.id) === doctorId);
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setFormError('');
@@ -161,7 +163,7 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
     }
     setBusy(true);
     try {
-      const created = await api<{ reference: string; manageToken: string }>('/api/public/bookings', {
+      const created = await api<{ reference: string; manageToken: string; whatsappConfirmationQueued?: boolean }>('/api/public/bookings', {
         method: 'POST',
         body: JSON.stringify({
           companyWebsite,
@@ -180,9 +182,21 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
       if (created.reference === 'RECEIVED') {
         setReference('');
         setManageToken('');
+        setWhatsappQueued(false);
       } else {
         setReference(created.reference);
         setManageToken(created.manageToken);
+        setWhatsappQueued(created.whatsappConfirmationQueued === true);
+        openBookingWhatsApp(phone, {
+          businessName: clinic.businessName,
+          patientName: fullName,
+          serviceName: service?.name || 'Appointment',
+          doctorName: doctor?.name || 'Doctor',
+          branchName: branch?.name,
+          date,
+          time,
+          reference: created.reference,
+        });
       }
       setBookingStatus('Pending');
       setStep(3);
@@ -321,6 +335,26 @@ export const PublicBooking: React.FC<{ slug: string }> = ({ slug }) => {
             {reference && <p className="text-sm text-slate-500">{copy.landingReference}</p>}
             {reference && <p className="font-mono text-lg font-bold">{reference}</p>}
             <p className="text-sm text-slate-600">{copy.landingPay}</p>
+            {whatsappQueued && <p className="text-sm text-emerald-700">{copy.whatsappConfirmQueued}</p>}
+            <p className="text-xs text-slate-500">{copy.whatsappConfirmHint}</p>
+            {reference && bookingStatus !== 'Cancelled' && (
+              <button
+                type="button"
+                className="btn-primary w-full"
+                onClick={() => openBookingWhatsApp(phone, {
+                  businessName: clinic.businessName,
+                  patientName: fullName,
+                  serviceName: service?.name || 'Appointment',
+                  doctorName: doctor?.name || 'Doctor',
+                  branchName: branch?.name,
+                  date,
+                  time,
+                  reference,
+                })}
+              >
+                {copy.whatsappOpenConfirm}
+              </button>
+            )}
             {formError && <p className="text-sm text-red-600">{formError}</p>}
             {reference && date && time && <p className="text-sm text-slate-700">{date} {time}</p>}
             {bookingStatus !== 'Cancelled' && manageToken && (

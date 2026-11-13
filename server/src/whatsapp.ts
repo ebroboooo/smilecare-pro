@@ -224,6 +224,106 @@ export async function sendDueWhatsAppReminders(transport: MessageTransport = fet
   }
 }
 
+export function buildBookingConfirmationBody(input: {
+  businessName: string;
+  patientName: string;
+  serviceName: string;
+  doctorName: string;
+  branchName?: string;
+  date: string;
+  time: string;
+  reference: string;
+}): string {
+  const lines = [
+    `${input.businessName} — appointment confirmation`,
+    `Hi ${input.patientName},`,
+    `Your visit is booked.`,
+    `Service: ${input.serviceName}`,
+    `Doctor: ${input.doctorName}`,
+    input.branchName ? `Clinic: ${input.branchName}` : '',
+    `When: ${input.date} at ${input.time}`,
+    `Reference: ${input.reference}`,
+    `Please pay at the clinic. Reply if you need to change the time.`,
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+/**
+ * Sends one booking confirmation to the patient phone via WhatsApp Cloud API.
+ * Skips quietly when WhatsApp is not configured or the patient has no phone.
+ */
+export async function sendBookingWhatsAppConfirmation(
+  appointmentId: number,
+  transport: MessageTransport = fetchTransport,
+): Promise<{ sent: boolean; providerMessageId?: string }> {
+  const row = getDb().prepare(
+    `SELECT a.id, a.org_id, a.starts_at, a.booking_ref, a.status,
+            p.phone, p.full_name,
+            s.name AS service_name,
+            d.name AS doctor_name,
+            b.name AS branch_name,
+            st.business_name,
+            st.whatsapp_phone_number_id, st.whatsapp_access_token
+     FROM appointments a
+     JOIN patients p ON p.id = a.patient_id
+     JOIN services s ON s.id = a.service_id
+     JOIN doctors d ON d.id = a.doctor_id
+     LEFT JOIN branches b ON b.id = a.branch_id
+     JOIN settings st ON st.org_id = a.org_id
+     WHERE a.id = ?`,
+  ).get(appointmentId) as {
+    id: number;
+    org_id: number;
+    starts_at: string;
+    booking_ref: string;
+    status: string;
+    phone: string;
+    full_name: string;
+    service_name: string;
+    doctor_name: string;
+    branch_name: string | null;
+    business_name: string;
+    whatsapp_phone_number_id: string | null;
+    whatsapp_access_token: string | null;
+  } | undefined;
+
+  if (!row?.phone) return { sent: false };
+  if (row.status === 'Cancelled') return { sent: false };
+  if (!row.whatsapp_phone_number_id || !row.whatsapp_access_token) return { sent: false };
+  if (!claimReminder(appointmentId, 'whatsapp_booking_confirm', row.starts_at)) {
+    return { sent: false };
+  }
+
+  const config = readWhatsAppConfig(row.org_id);
+  const local = utcToLocal(row.starts_at, getClinicZone());
+  const body = buildBookingConfirmationBody({
+    businessName: row.business_name || 'SmileCare',
+    patientName: row.full_name,
+    serviceName: row.service_name,
+    doctorName: row.doctor_name,
+    branchName: row.branch_name || undefined,
+    date: local.date,
+    time: local.time,
+    reference: row.booking_ref,
+  });
+
+  try {
+    const result = await deliverWhatsApp(config, { to: row.phone, body }, transport);
+    setReminderStatus(appointmentId, 'whatsapp_booking_confirm', 'sent');
+    return { sent: true, providerMessageId: result.providerMessageId };
+  } catch {
+    setReminderStatus(appointmentId, 'whatsapp_booking_confirm', 'failed');
+    logger.warn({ appointmentId, orgId: row.org_id }, 'WhatsApp booking confirmation was not sent');
+    return { sent: false };
+  }
+}
+
+/** Fire-and-forget after a booking is saved. Never blocks the HTTP response. */
+export function queueBookingWhatsAppConfirmation(appointmentId: number): void {
+  if (process.env.NODE_ENV === 'test') return;
+  void sendBookingWhatsAppConfirmation(appointmentId);
+}
+
 export function startWhatsAppReminderLoop(): void {
   if (process.env.NODE_ENV === 'test' || reminderTimer) return;
   reminderTimer = setInterval(() => {

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { assertSlotAvailable, canTransition, slotsForDoctor } from '../availability.js';
 import { writeAudit } from '../audit.js';
 import { createPatientLink, queueAppointmentAlert, refreshTelegramBot, sendTelegramTest } from '../telegram.js';
-import { sendWhatsAppTest } from '../whatsapp.js';
+import { queueBookingWhatsAppConfirmation, sendWhatsAppTest } from '../whatsapp.js';
 import { newBookingRef, requireAuth, requireRoles } from '../auth.js';
 import { getDb } from '../db.js';
 import { HttpError, asyncHandler, parseId } from '../http.js';
@@ -860,6 +860,7 @@ clinicRouter.post('/appointments', staffWrite, validateBody(appointmentBody), (r
   }
   writeAudit(req.user!, 'appointment_created', `Created appointment ${id}`);
   queueAppointmentAlert(id);
+  queueBookingWhatsAppConfirmation(id);
   const row = getDb().prepare('SELECT * FROM appointments WHERE id = ?').get(id) as ApptRow;
   res.status(201).json(mapAppointment(row));
 });
