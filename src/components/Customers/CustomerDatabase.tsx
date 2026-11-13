@@ -278,7 +278,7 @@ export const CustomerDatabase: React.FC = () => {
                   onChange={(e) => setFormData(prev => ({ ...prev, medicalAlerts: e.target.value }))}
                   rows={2}
                   className="w-full input-field text-xs"
-                  placeholder="Allergy, pacemaker, …"
+                  placeholder={t.medicalAlertsPlaceholder}
                 />
               </div>
 

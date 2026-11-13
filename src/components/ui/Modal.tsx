@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { translations } from '../../utils/translations';
 
 interface ModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   footer?: React.ReactNode;
+  closeLabel?: string;
 }
 
 const sizeMap = {
@@ -24,7 +26,10 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md',
   footer,
+  closeLabel,
 }) => {
+  const lang = typeof document !== 'undefined' && document.documentElement.lang === 'ar' ? 'ar' : 'en';
+  const resolvedCloseLabel = closeLabel || translations[lang].close;
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,7 +57,7 @@ export const Modal: React.FC<ModalProps> = ({
       <div className={`bg-white rounded-2xl shadow-elevated w-full ${sizeMap[size]} animate-slide-up max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 id="modal-title" className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="btn-ghost p-1.5" aria-label="Close">
+          <button onClick={onClose} className="btn-ghost p-1.5" aria-label={resolvedCloseLabel}>
             <X className="h-5 w-5" />
           </button>
         </div>

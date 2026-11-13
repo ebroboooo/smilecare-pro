@@ -75,7 +75,7 @@ export const CustomerProfile: React.FC<Props> = ({ customerId }) => {
       }
       return {
         id: idx,
-        date: 'Log Note',
+        date: t.logNoteFallback,
         text: block
       };
     });

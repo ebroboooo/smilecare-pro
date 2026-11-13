@@ -285,9 +285,9 @@ export const LandingPage: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-500">{copy.landingFullName}</label>
             <input className="input-field" required value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder={copy.landingFullName} autoComplete="name" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingPhone}</label>
-            <input className="input-field" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+20 100 000 0000" autoComplete="tel" />
+            <input className="input-field" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder={copy.phonePlaceholderExample} autoComplete="tel" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingEmail}</label>
-            <input className="input-field" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="name@example.com" autoComplete="email" />
+            <input className="input-field" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder={copy.emailPlaceholderExample} autoComplete="email" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingMessage}</label>
             <textarea className="input-field min-h-[100px]" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder={copy.landingMessage} />
             {sent ? <p className="text-sm text-emerald-700">{copy.landingSent}</p> : <button className="btn-primary w-full" type="submit">{copy.landingSend}</button>}

@@ -89,13 +89,13 @@ export const Settings: React.FC = () => {
 
   const handleFreshStart = async () => {
     await resetEmptyWorkspace();
-    success('Workspace reset. Your clinic data is now empty.');
+    success(t.workspaceReset);
     setConfirmFreshStart(false);
   };
 
   const handleDemoLoad = async () => {
     await seedBusinessPreset();
-    success('Dental clinic demo data loaded successfully.');
+    success(t.demoDataLoaded);
     setConfirmDemoLoad(false);
   };
 
@@ -110,7 +110,7 @@ export const Settings: React.FC = () => {
 
     await dispatchAuditLog("Settings Changed", `Updated clinic profile information.`);
     await refreshData();
-    success('Settings saved successfully.');
+    success(t.settingsSaved);
   };
 
   // Toggle individual integration features
@@ -132,7 +132,7 @@ export const Settings: React.FC = () => {
       
       <div>
         <h2 className="text-xl font-bold text-slate-900">{t.settings}</h2>
-        <p className="text-xs text-slate-500">Configure clinic information, demo data, integrations, and activity logs</p>
+        <p className="text-xs text-slate-500">{t.settingsHelp}</p>
       </div>
 
       {/* Sub tabs nav bar */}
@@ -145,7 +145,7 @@ export const Settings: React.FC = () => {
               activeSubTab === tab ? 'border-brand-500 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-800'
             }`}
           >
-            {tab === 'preset' ? t.presetSeeding : tab === 'modules' ? 'Integrations' : tab === 'audit' ? t.auditLogs : 'Clinic Profile'}
+            {tab === 'preset' ? t.presetSeeding : tab === 'modules' ? t.tabIntegrations : tab === 'audit' ? t.auditLogs : t.tabProfile}
           </button>
         ))}
       </div>
@@ -158,11 +158,11 @@ export const Settings: React.FC = () => {
           <form onSubmit={handleProfileSave} className="space-y-4">
             <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2 mb-2">
               <Building className="h-4.5 w-4.5 text-brand-600" />
-              <span>Clinic Contact Information</span>
+              <span>{t.contactInfo}</span>
             </h4>
 
             <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Clinic Name</label>
+              <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.clinicName}</label>
               <input
                 type="text"
                 required
@@ -228,27 +228,27 @@ export const Settings: React.FC = () => {
                   onChange={(e) => setProfileData(prev => ({ ...prev, language: e.target.value as any }))}
                   className="w-full input-field text-xs"
                 >
-                  <option value="en">English (LTR)</option>
-                  <option value="ar">العربية - Arabic (RTL)</option>
+                  <option value="en">{t.englishLtr}</option>
+                  <option value="ar">{t.arabicRtl}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Timezone</label>
+              <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.timezone}</label>
               <input className="w-full input-field text-xs" value={profileData.timezone} onChange={(e) => setProfileData((prev) => ({ ...prev, timezone: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Notice (minutes)
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{t.minNoticeMinutes}
                 <input type="number" min={0} className="mt-1 w-full input-field text-xs" value={rules.minNoticeMinutes} onChange={(e) => setRules({ ...rules, minNoticeMinutes: Number(e.target.value) })} />
               </label>
-              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Days ahead
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{t.maxDaysAhead}
                 <input type="number" min={1} className="mt-1 w-full input-field text-xs" value={rules.maxDaysAhead} onChange={(e) => setRules({ ...rules, maxDaysAhead: Number(e.target.value) })} />
               </label>
-              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Cancel window (hours)
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{t.cancelWindowHours}
                 <input type="number" min={0} className="mt-1 w-full input-field text-xs" value={rules.cancelWindowHours} onChange={(e) => setRules({ ...rules, cancelWindowHours: Number(e.target.value) })} />
               </label>
-              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Slot interval (minutes)
+              <label className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">{t.slotIntervalMinutes}
                 <input type="number" min={5} className="mt-1 w-full input-field text-xs" value={rules.slotIntervalMinutes} onChange={(e) => setRules({ ...rules, slotIntervalMinutes: Number(e.target.value) })} />
               </label>
             </div>
@@ -265,8 +265,8 @@ export const Settings: React.FC = () => {
       {/* 2. Preset Layout Seeder presets */}
       {activeSubTab === 'preset' && !DEMO_MODE && (
         <div className="panel p-6 max-w-xl space-y-2">
-          <h4 className="font-bold text-slate-900 text-sm">Clinic data</h4>
-          <p className="text-xs text-slate-500">Sample patients and appointments can be loaded with <span className="font-mono">npm run seed:demo</span> before the first owner signs in. This screen does not erase clinic records.</p>
+          <h4 className="font-bold text-slate-900 text-sm">{t.clinicData}</h4>
+          <p className="text-xs text-slate-500">{t.clinicDataHelp}</p>
         </div>
       )}
 
@@ -280,31 +280,31 @@ export const Settings: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
             <div className="card p-5 rounded-2xl border-slate-200 flex flex-col justify-between hover:border-brand-300 transition-all border-brand-500/60 bg-brand-500/5">
               <div>
-                <h5 className="font-bold text-slate-900 text-base">Dental Clinic Demo</h5>
+                <h5 className="font-bold text-slate-900 text-base">{t.demoClinicTitle}</h5>
                 <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-                  Load sample patients, doctors, dental services, appointments, and inquiries for SmileCare Pro.
+                  {t.demoClinicDesc}
                 </p>
               </div>
               <button
                 onClick={() => setConfirmDemoLoad(true)}
                 className="btn-secondary py-2 text-xs font-bold mt-5 w-full"
               >
-                {settings?.activePreset === 'Dental' ? 'Reload Demo Data' : 'Load Demo Data'}
+                {settings?.activePreset === 'Dental' ? t.reloadDemoData : t.loadDemoData}
               </button>
             </div>
 
             <div className="card p-5 rounded-2xl border-slate-200 flex flex-col justify-between">
               <div>
-                <h5 className="font-bold text-slate-900 text-base">Fresh Start</h5>
+                <h5 className="font-bold text-slate-900 text-base">{t.freshStartTitle}</h5>
                 <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-                  Start with an empty workspace — no patients, services, doctors, or appointments.
+                  {t.freshStartDesc}
                 </p>
               </div>
               <button
                 onClick={() => setConfirmFreshStart(true)}
                 className="btn-secondary py-2 text-xs font-bold mt-5 w-full border-red-200 text-red-600 hover:bg-red-50"
               >
-                Reset to Empty Workspace
+                {t.resetEmptyWorkspaceBtn}
               </button>
             </div>
           </div>
@@ -315,16 +315,16 @@ export const Settings: React.FC = () => {
       {activeSubTab === 'modules' && (
         <div className="card p-6 rounded-2xl border-slate-200 max-w-xl space-y-5">
           <div>
-            <h4 className="font-bold text-slate-900 text-sm">Clinic options</h4>
-            <p className="text-[10px] text-slate-500">Payments are collected at the clinic. Online card gateways are not enabled.</p>
+            <h4 className="font-bold text-slate-900 text-sm">{t.clinicOptions}</h4>
+            <p className="text-[10px] text-slate-500">{t.clinicOptionsHelp}</p>
           </div>
 
           {settings && (
             <div className="space-y-4">
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Waitlist</p>
-                  <p className="text-[10px] text-slate-400">Allow staff to keep patients waiting for an open slot</p>
+                  <p className="text-xs font-bold text-slate-900">{t.waitlist}</p>
+                  <p className="text-[10px] text-slate-400">{t.waitlistOption}</p>
                 </div>
                 <button type="button" onClick={() => handleToggleFeature('waitlistEnabled')}>
                   {settings.features.waitlistEnabled
@@ -335,8 +335,8 @@ export const Settings: React.FC = () => {
               </div>
               <div className="flex items-center justify-between py-2">
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Online booking</p>
-                  <p className="text-[10px] text-slate-400">Let patients request a time from the public page</p>
+                  <p className="text-xs font-bold text-slate-900">{t.onlineBooking}</p>
+                  <p className="text-[10px] text-slate-400">{t.bookingOption}</p>
                 </div>
                 <button type="button" onClick={() => handleToggleFeature('publicBookingEnabled')}>
                   {settings.features.publicBookingEnabled
@@ -508,7 +508,7 @@ export const Settings: React.FC = () => {
           <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-3">
             <div>
               <h4 className="font-bold text-slate-900 text-sm">{t.auditLogs}</h4>
-              <p className="text-[10px] text-slate-500">Security event history for tenant verification</p>
+              <p className="text-[10px] text-slate-500">{t.activityHelp}</p>
             </div>
             <ShieldAlert className="h-5 w-5 text-slate-500" />
           </div>
@@ -521,7 +521,7 @@ export const Settings: React.FC = () => {
                   <span>{new Date(log.timestamp).toLocaleString()}</span>
                 </div>
                 <p className="text-slate-900 font-semibold">{log.details}</p>
-                <p className="text-[10px] text-slate-500">Triggered by: {log.userName}</p>
+                <p className="text-[10px] text-slate-500">{t.auditTriggeredBy}: {log.userName}</p>
               </div>
             ))}
           </div>
@@ -530,9 +530,11 @@ export const Settings: React.FC = () => {
 
       <ConfirmDialog
         isOpen={confirmFreshStart}
-        title="Reset to Empty Workspace?"
-        message="This will erase all patients, doctors, services, and appointments. This action cannot be undone."
-        confirmLabel="Reset Workspace"
+        title={t.resetWorkspaceTitle}
+        message={t.resetWorkspaceMessage}
+        confirmLabel={t.resetWorkspaceConfirm}
+        cancelLabel={t.cancel}
+        pleaseWaitLabel={t.pleaseWait}
         variant="danger"
         onConfirm={handleFreshStart}
         onClose={() => setConfirmFreshStart(false)}
@@ -540,9 +542,11 @@ export const Settings: React.FC = () => {
 
       <ConfirmDialog
         isOpen={confirmDemoLoad}
-        title="Load Dental Demo Data?"
-        message="This will replace your current clinic data with the SmileCare dental demo dataset."
-        confirmLabel="Load Demo Data"
+        title={t.loadDemoTitle}
+        message={t.loadDemoMessage}
+        confirmLabel={t.loadDemoConfirm}
+        cancelLabel={t.cancel}
+        pleaseWaitLabel={t.pleaseWait}
         variant="warning"
         onConfirm={handleDemoLoad}
         onClose={() => setConfirmDemoLoad(false)}

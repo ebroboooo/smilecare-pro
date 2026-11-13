@@ -75,7 +75,7 @@ export const UserManagement: React.FC = () => {
         <p className="text-sm text-slate-500">{t.staffHelp}</p>
         {DEMO_MODE && (
           <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
-            Demo staff accounts stay in this browser only.
+            {t.staffDemoNote}
           </p>
         )}
       </div>
@@ -96,7 +96,7 @@ export const UserManagement: React.FC = () => {
 
       <div className="panel divide-y divide-slate-100">
         {users.length === 0 ? (
-          <p className="p-4 text-sm text-slate-500">No staff accounts yet.</p>
+          <p className="p-4 text-sm text-slate-500">{t.noStaffAccounts}</p>
         ) : (
           users.map((user) => (
             <div key={user.id} className="flex items-center justify-between gap-3 p-4">

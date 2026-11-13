@@ -5,7 +5,7 @@ export const LanguageSwitch: React.FC<{
   lang: Language;
   onChange: (lang: Language) => void;
 }> = ({ lang, onChange }) => (
-  <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden text-xs font-semibold" role="group" aria-label={lang === 'ar' ? 'اللغة' : 'Language'}>
+  <div className="inline-flex rounded-xl border border-slate-200 bg-white overflow-hidden text-xs font-semibold" role="group" aria-label={lang === 'ar' ? 'اللغة' : 'Language'} title={lang === 'ar' ? 'اللغة' : 'Language'}>
     <button
       type="button"
       className={lang === 'en' ? 'bg-brand-600 text-white px-3 py-1.5' : 'px-3 py-1.5 text-slate-600 hover:bg-slate-50'}

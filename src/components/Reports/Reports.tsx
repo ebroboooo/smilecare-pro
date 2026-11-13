@@ -65,7 +65,7 @@ export const Reports: React.FC = () => {
     .map(([id, count]) => {
       const srv = services.find(s => s.id === id);
       return {
-        name: srv ? srv.name : 'Unknown Service',
+        name: srv ? srv.name : t.unknownService,
         price: srv ? srv.price : 0,
         count,
         revenue: count * (srv ? srv.price : 0)
@@ -88,7 +88,7 @@ export const Reports: React.FC = () => {
   // CSV Exporter
   const handleExportCSV = () => {
     if (currentReportsData.length === 0) {
-      warning('No appointment data to export for the selected range.');
+      warning(t.noExportData);
       return;
     }
 
@@ -114,7 +114,7 @@ export const Reports: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    success('Report exported successfully.');
+    success(t.exportDone);
   };
 
   // PDF Printing trigger
@@ -129,7 +129,7 @@ export const Reports: React.FC = () => {
       <div className="flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900">{t.reports}</h2>
-          <p className="text-xs text-slate-500">Consolidated reports, financial matrices, and transaction summaries</p>
+          <p className="text-xs text-slate-500">{t.reportsHelp}</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -138,21 +138,23 @@ export const Reports: React.FC = () => {
             className="btn-secondary px-3 py-2 text-xs flex items-center gap-1.5"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            <span>Export CSV</span>
+            <span>{t.exportCsv}</span>
           </button>
           <button 
             onClick={handleExportPDF}
             className="btn-primary px-3 py-2 text-xs flex items-center gap-1.5"
           >
             <Download className="h-4 w-4" />
-            <span>Print / PDF</span>
+            <span>{t.printPdf}</span>
           </button>
         </div>
       </div>
 
       {/* Date Range selectors */}
       <div className="flex gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200 w-fit">
-        {(['Today', 'Week', 'Month', 'All'] as const).map(range => (
+        {(['Today', 'Week', 'Month', 'All'] as const).map(range => {
+          const label = range === 'Today' ? t.rangeToday : range === 'Week' ? t.rangeWeek : range === 'Month' ? t.rangeMonth : t.rangeAll;
+          return (
           <button
             key={range}
             onClick={() => setDateRange(range)}
@@ -160,27 +162,28 @@ export const Reports: React.FC = () => {
               dateRange === range ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-800'
             }`}
           >
-            {range === 'All' ? 'All Time' : range}
+            {label}
           </button>
-        ))}
+        );
+        })}
       </div>
 
       {/* Reports Metrics Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="card p-5 rounded-2xl border-slate-200 text-center">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Gross Booking Sales</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.grossSales}</p>
           <h3 className="text-2xl font-bold text-green-400 mt-1">{totalRevenueVal} {currency}</h3>
         </div>
         <div className="card p-5 rounded-2xl border-slate-200 text-center">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Completion Rate</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.completionRate}</p>
           <h3 className="text-2xl font-bold text-slate-900 mt-1">{completionRate}%</h3>
         </div>
         <div className="card p-5 rounded-2xl border-slate-200 text-center">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Bookings</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.totalBookings}</p>
           <h3 className="text-2xl font-bold text-brand-700 mt-1">{totalBookings}</h3>
         </div>
         <div className="card p-5 rounded-2xl border-slate-200 text-center">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Cancellations / No-Shows</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.cancelNoShow}</p>
           <h3 className="text-2xl font-bold text-red-400 mt-1">{cancelledCount} / {noShowCount}</h3>
         </div>
       </div>
@@ -190,18 +193,18 @@ export const Reports: React.FC = () => {
         {/* Left Side: Services Breakdown */}
         <div className="card p-5 rounded-2xl border-slate-200 space-y-4">
           <div>
-            <h4 className="font-bold text-slate-900 text-sm">Services Revenue Contribution</h4>
-            <p className="text-[10px] text-slate-500">Contributions by service category and purchase counts</p>
+            <h4 className="font-bold text-slate-900 text-sm">{t.serviceRevenue}</h4>
+            <p className="text-[10px] text-slate-500">{t.serviceRevenueHelp}</p>
           </div>
 
           <div className="space-y-3.5">
             {rankedServices.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-6">No service transaction data available.</p>
+              <p className="text-xs text-slate-500 text-center py-6">{t.noServiceData}</p>
             ) : (
               rankedServices.map((srv, idx) => (
                 <div key={idx} className="space-y-1.5">
                   <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-slate-900">{srv.name} ({srv.count} sales)</span>
+                    <span className="text-slate-900">{srv.name} ({srv.count} {t.salesCount})</span>
                     <span className="text-brand-700 font-bold">{srv.revenue} {currency}</span>
                   </div>
                   {/* Progress visual bar */}
@@ -217,8 +220,8 @@ export const Reports: React.FC = () => {
         {/* Right Side: Employee Revenue Share */}
         <div className="card p-5 rounded-2xl border-slate-200 space-y-4">
           <div>
-            <h4 className="font-bold text-slate-900 text-sm">Doctor Revenue Leaderboard</h4>
-            <p className="text-[10px] text-slate-500">Ranked by completed appointment revenue per doctor</p>
+            <h4 className="font-bold text-slate-900 text-sm">{t.doctorRevenue}</h4>
+            <p className="text-[10px] text-slate-500">{t.doctorRevenueHelp}</p>
           </div>
 
           <div className="space-y-3">
@@ -235,7 +238,7 @@ export const Reports: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-extrabold text-green-400">{emp.revenue} {currency}</p>
-                  <p className="text-[9px] text-slate-500">{emp.bookingsCount} sessions</p>
+                  <p className="text-[9px] text-slate-500">{emp.bookingsCount} {t.salesCount}</p>
                 </div>
               </div>
             ))}

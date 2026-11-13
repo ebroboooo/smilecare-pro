@@ -6,6 +6,7 @@ import { CLINIC_ID, type Reservation, type ReservationStatus, type PaymentStatus
 import { EnterpriseNotificationHub } from '../../utils/adapters';
 import { DEMO_MODE } from '../../db';
 import { ClinicClosures } from './ClinicClosures';
+import { statusText } from '../../utils/locale';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -14,6 +15,10 @@ import {
   Trash2, 
   AlertCircle
 } from 'lucide-react';
+
+const WEEKDAY_KEYS = ['daySun', 'dayMon', 'dayTue', 'dayWed', 'dayThu', 'dayFri', 'daySat'] as const;
+const MONTH_HEADER_KEYS = ['dayMon', 'dayTue', 'dayWed', 'dayThu', 'dayFri', 'daySat', 'daySun'] as const;
+const BOOKING_STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'NoShow'] as const;
 
 function localDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -145,7 +150,8 @@ export const SmartCalendar: React.FC = () => {
     );
     if (hasOverlap) {
       const emp = employees.find(e => e.id === employeeId);
-      setConflictWarning(`Conflict Warning: ${emp?.name || 'Selected staff'} is already booked during this time slot.`);
+      const name = emp?.name || t.selectedStaff;
+      setConflictWarning(t.scheduleConflict.replace('{name}', name));
     } else {
       setConflictWarning(null);
     }
@@ -214,18 +220,24 @@ export const SmartCalendar: React.FC = () => {
         const srv = services.find(s => s.id === formData.serviceId);
         const emp = employees.find(e => e.id === formData.employeeId);
         
+        const customerName = cust?.fullName || t.fallbackClient;
+        const serviceName = srv?.name || t.fallbackService;
         await EnterpriseNotificationHub.dispatchBookingAlert(
-          org, 
-          newRes, 
-          cust?.fullName || "Client", 
-          srv?.name || "Service", 
-          emp?.name || "Doctor"
+          org,
+          newRes,
+          customerName,
+          serviceName,
+          emp?.name || t.fallbackDoctor,
+          {
+            title: t.bookingConfirmedTitle,
+            message: `${customerName} — ${serviceName} — ${newRes.date} ${t.at} ${newRes.time}`,
+          },
         );
       }
       setModalOpen(false);
       await refreshData();
     } catch (err) {
-      setConflictWarning(err instanceof Error ? err.message : 'Could not save this appointment');
+      setConflictWarning(err instanceof Error ? err.message : t.couldNotSaveAppointment);
     }
   };
 
@@ -243,10 +255,11 @@ export const SmartCalendar: React.FC = () => {
       
       if (matchingWaitlist) {
         // Create alert for promotion
+        const promoteName = customers.find(c => c.id === matchingWaitlist.customerId)?.fullName || t.fallbackClient;
         await db.notifications.create(org, {
           branchId: formData.branchId,
-          title: "Waitlist Promotion Available",
-          message: `Slot opened on ${formData.date}. Promote ${customers.find(c => c.id === matchingWaitlist.customerId)?.fullName} from waitlist.`,
+          title: t.waitlistPromotionTitle,
+          message: t.waitlistPromotionMessage.replace('{date}', formData.date).replace('{name}', promoteName),
           read: false,
           type: "System"
         });
@@ -278,7 +291,7 @@ export const SmartCalendar: React.FC = () => {
     setModalOpen(false);
     await refreshData();
     } catch (err) {
-      setConflictWarning(err instanceof Error ? err.message : 'Could not duplicate this appointment');
+      setConflictWarning(err instanceof Error ? err.message : t.couldNotDuplicateAppointment);
     }
   };
 
@@ -326,9 +339,9 @@ export const SmartCalendar: React.FC = () => {
       >
         <div className="flex items-center justify-between font-bold">
           <span>{res.time}</span>
-          <span className="opacity-80">({res.duration}m)</span>
+          <span className="opacity-80">({res.duration} {t.minutesShort})</span>
         </div>
-        <p className="font-extrabold text-slate-900 truncate mt-1">{cust?.fullName || 'Walk-in Client'}</p>
+        <p className="font-extrabold text-slate-900 truncate mt-1">{cust?.fullName || t.walkInClient}</p>
         <p className="opacity-90 truncate mt-0.5">{srv?.name}</p>
         <div className="flex items-center gap-1 mt-1 opacity-70">
           <span className="h-1 w-1 rounded-full bg-current"></span>
@@ -422,7 +435,7 @@ export const SmartCalendar: React.FC = () => {
               return (
                 <div key={idx} className="space-y-1 border-r border-slate-100 last:border-0">
                   <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                    {date.toLocaleDateString([], {weekday: 'short'})}
+                    {t[WEEKDAY_KEYS[date.getDay()]]}
                   </p>
                   <p className={`text-base font-bold h-7 w-7 flex items-center justify-center mx-auto rounded-full ${
                     isToday ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20' : 'text-slate-800'
@@ -477,7 +490,7 @@ export const SmartCalendar: React.FC = () => {
                 <div key={timeHour} className="min-h-[72px] p-2 flex gap-3" onClick={() => handleOpenCreateModal(dateStr, timeHour)}>
                   <span className="text-[10px] text-slate-400 w-12 shrink-0">{timeHour}</span>
                   <div className="flex-1 flex flex-col gap-1.5">
-                    {hourRes.length === 0 && <span className="text-[10px] text-slate-300">Open</span>}
+                    {hourRes.length === 0 && <span className="text-[10px] text-slate-300">{t.openSlot}</span>}
                     {hourRes.map(renderAppointment)}
                   </div>
                 </div>
@@ -490,7 +503,7 @@ export const SmartCalendar: React.FC = () => {
       {currentView === 'Month' && (
         <div className="panel rounded-2xl border-slate-200 overflow-hidden shadow-2xl">
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => <div key={label}>{label}</div>)}
+            {MONTH_HEADER_KEYS.map((key) => <div key={key}>{t[key]}</div>)}
           </div>
           <div className="grid grid-cols-7">
             {monthCells().map((date, index) => {
@@ -615,7 +628,7 @@ export const SmartCalendar: React.FC = () => {
                 </div>
                 {/* Duration */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Duration (m)</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.durationShort}</label>
                   <input
                     type="number"
                     name="duration"
@@ -629,23 +642,21 @@ export const SmartCalendar: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 {/* Status */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Booking Status</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.bookingStatus}</label>
                   <select
                     name="status"
                     value={formData.status}
                     onChange={handleFormChange}
                     className="w-full input-field text-xs"
                   >
-                    <option value="Pending">Pending Queue</option>
-                    <option value="Confirmed">Confirmed Slot</option>
-                    <option value="Completed">Completed Session</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="NoShow">No Show Alert</option>
+                    {BOOKING_STATUSES.map((value) => (
+                      <option key={value} value={value}>{statusText(t, value)}</option>
+                    ))}
                   </select>
                 </div>
                 {/* Payment Status */}
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Payment Status</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.paymentStatus}</label>
                   <select
                     name="paymentStatus"
                     value={formData.paymentStatus}

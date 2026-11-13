@@ -3,12 +3,35 @@ import { useApp } from '../../context/AppContext';
 import { db } from '../../db';
 import { CLINIC_ID, type LeadStatus } from '../../types';
 import { Plus, MoveRight, CheckCircle2 } from 'lucide-react';
+import { translations } from '../../utils/translations';
 
 const STAGES: LeadStatus[] = ['New', 'Contacted', 'Interested', 'Converted', 'Lost'];
 
 export const LeadsPipeline: React.FC = () => {
   const { leads, branches, refreshData, dispatchAuditLog, settings } = useApp();
-  
+  const t = translations[settings?.language === 'ar' ? 'ar' : 'en'];
+
+  const stageLabel = (stage: LeadStatus): string => {
+    const map: Record<LeadStatus, string> = {
+      New: t.stageNew,
+      Contacted: t.stageContacted,
+      Interested: t.stageInterested,
+      Converted: t.stageConverted,
+      Lost: t.stageLost,
+    };
+    return map[stage];
+  };
+
+  const sourceLabel = (value: string): string => {
+    const map: Record<string, string> = {
+      'Google Ads': t.sourceGoogleAds,
+      'Instagram Promo': t.sourceInstagramPromo,
+      'Website Contact Form': t.sourceWebsiteContactForm,
+      'Walk-in Referral': t.sourceWalkInReferral,
+    };
+    return map[value] ?? value;
+  };
+
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -21,7 +44,6 @@ export const LeadsPipeline: React.FC = () => {
 
   const currency = settings?.currency || 'USD';
 
-  // Calculate stats
   const totalPipelineVal = leads.reduce((sum, l) => sum + l.value, 0);
   const activeLeads = leads.filter(l => l.status !== 'Converted' && l.status !== 'Lost').length;
 
@@ -41,7 +63,6 @@ export const LeadsPipeline: React.FC = () => {
 
     await dispatchAuditLog("Lead Captured", `Captured new CRM Lead: ${formData.fullName} ($${formData.value})`);
     setModalOpen(false);
-    // Reset Form
     setFormData({ fullName: '', phone: '', email: '', source: 'Google Ads', value: 100, notes: '' });
     await refreshData();
   };
@@ -56,11 +77,10 @@ export const LeadsPipeline: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      {/* Header Panel */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Lead Management Pipeline</h2>
-          <p className="text-xs text-slate-500">Nurture and convert customer leads into verified appointments</p>
+          <h2 className="text-xl font-bold text-slate-900">{t.leadPipeline}</h2>
+          <p className="text-xs text-slate-500">{t.inquiriesHelp}</p>
         </div>
         
         <button 
@@ -68,27 +88,25 @@ export const LeadsPipeline: React.FC = () => {
           className="btn-primary px-3 py-2 text-xs flex items-center gap-1.5"
         >
           <Plus className="h-4 w-4" />
-          <span>Add New Lead</span>
+          <span>{t.addNewLead}</span>
         </button>
       </div>
 
-      {/* CRM Stats Summary Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="card p-5 rounded-2xl border-slate-200 bg-gradient-to-b from-slate-900/60 to-slate-950/40">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Pipeline Value</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.pipelineValue}</p>
           <h4 className="text-2xl font-bold text-brand-700 mt-1">{totalPipelineVal.toLocaleString()} {currency}</h4>
         </div>
         <div className="card p-5 rounded-2xl border-slate-200 bg-gradient-to-b from-slate-900/60 to-slate-950/40">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Active Deals</p>
-          <h4 className="text-2xl font-bold text-slate-900 mt-1">{activeLeads} Leads</h4>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.activeInquiries}</p>
+          <h4 className="text-2xl font-bold text-slate-900 mt-1">{activeLeads} {t.inquiriesWord}</h4>
         </div>
         <div className="card p-5 rounded-2xl border-slate-200 bg-gradient-to-b from-slate-900/60 to-slate-950/40">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">New inquiries</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t.newInquiries}</p>
           <h4 className="text-2xl font-bold text-slate-900 mt-1">{leads.filter((lead) => lead.status === 'New').length}</h4>
         </div>
       </div>
 
-      {/* Kanban Board Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
         {STAGES.map(stage => {
           const stageLeads = leads.filter(l => l.status === stage);
@@ -96,7 +114,7 @@ export const LeadsPipeline: React.FC = () => {
           return (
             <div key={stage} className="bg-white/20 border border-slate-200 p-4 rounded-2xl min-w-[220px] space-y-4 flex flex-col">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                <span className="text-xs font-bold text-slate-900 tracking-wide">{stage}</span>
+                <span className="text-xs font-bold text-slate-900 tracking-wide">{stageLabel(stage)}</span>
                 <span className="text-[10px] bg-slate-100 text-slate-400 font-bold px-2 py-0.5 rounded-full">
                   {stageLeads.length}
                 </span>
@@ -104,13 +122,13 @@ export const LeadsPipeline: React.FC = () => {
 
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[420px] min-h-[150px]">
                 {stageLeads.length === 0 ? (
-                  <p className="text-[10px] text-slate-600 text-center py-8">Drop leads here</p>
+                  <p className="text-[10px] text-slate-600 text-center py-8">{t.dropLeadsHere}</p>
                 ) : (
                   stageLeads.map(lead => (
                     <div key={lead.id} className="card p-4 rounded-xl border-slate-200 flex flex-col justify-between gap-3 bg-slate-50 hover:border-brand-500/20 transition-all">
                       <div>
                         <h5 className="text-xs font-bold text-slate-900">{lead.fullName}</h5>
-                        <p className="text-[9px] text-brand-600 font-bold mt-0.5">{lead.source}</p>
+                        <p className="text-[9px] text-brand-600 font-bold mt-0.5">{sourceLabel(lead.source)}</p>
                         <p className="text-xs font-bold text-slate-800 mt-1">{lead.value} {currency}</p>
                       </div>
 
@@ -130,7 +148,7 @@ export const LeadsPipeline: React.FC = () => {
                             <button
                               onClick={() => handleUpdateStatus(lead.id, lead.fullName, 'Converted')}
                               className="p-1 hover:bg-green-500/10 text-green-500 rounded"
-                              title="Mark Converted"
+                              title={t.markConverted}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
                             </button>
@@ -143,7 +161,7 @@ export const LeadsPipeline: React.FC = () => {
                                 if (nextStage) handleUpdateStatus(lead.id, lead.fullName, nextStage);
                               }}
                               className="p-1 hover:bg-brand-500/10 text-brand-600 rounded"
-                              title="Advance Lead"
+                              title={t.advanceLead}
                             >
                               <MoveRight className="h-3.5 w-3.5" />
                             </button>
@@ -159,15 +177,14 @@ export const LeadsPipeline: React.FC = () => {
         })}
       </div>
 
-      {/* Add Lead Modal Dialog */}
       {modalOpen && (
         <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Add CRM Lead</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">{t.addNewLead}</h3>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Full Name</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.fullName}</label>
                 <input
                   type="text"
                   required
@@ -179,7 +196,7 @@ export const LeadsPipeline: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Phone Number</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.phone}</label>
                   <input
                     type="tel"
                     required
@@ -189,7 +206,7 @@ export const LeadsPipeline: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Email Address</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.email}</label>
                   <input
                     type="email"
                     required
@@ -202,20 +219,20 @@ export const LeadsPipeline: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Lead Source</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.leadSource}</label>
                   <select
                     value={formData.source}
                     onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value }))}
                     className="w-full input-field text-xs"
                   >
-                    <option value="Google Ads">Google Ads</option>
-                    <option value="Instagram Promo">Instagram Promo</option>
-                    <option value="Website Contact Form">Website Form</option>
-                    <option value="Walk-in Referral">Walk-in Referral</option>
+                    <option value="Google Ads">{t.sourceGoogleAds}</option>
+                    <option value="Instagram Promo">{t.sourceInstagramPromo}</option>
+                    <option value="Website Contact Form">{t.sourceWebsiteContactForm}</option>
+                    <option value="Walk-in Referral">{t.sourceWalkInReferral}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Forecast Value ({currency})</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.leadValue} ({currency})</label>
                   <input
                     type="number"
                     required
@@ -227,13 +244,13 @@ export const LeadsPipeline: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Notes</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.notes}</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                   className="w-full input-field text-xs"
-                  placeholder="Details of client requirements..."
+                  placeholder={t.leadNotesPlaceholder}
                 />
               </div>
 
@@ -243,13 +260,13 @@ export const LeadsPipeline: React.FC = () => {
                   onClick={() => setModalOpen(false)}
                   className="btn-secondary px-4 py-2 text-xs"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary px-4 py-2 text-xs"
                 >
-                  Add Lead
+                  {t.addLead}
                 </button>
               </div>
             </form>

@@ -12,8 +12,21 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { LanguageSwitch } from './components/ui/LanguageSwitch';
 import { Smile, UserCheck } from 'lucide-react';
 import type { UserRole } from './types';
-import { translations, type Language } from './utils/translations';
+import { translations, type Language, type TranslationKeys } from './utils/translations';
 import { applyDocumentLanguage, readPublicLanguage, writePublicLanguage } from './utils/publicLanguage';
+
+const LocalizedAdminTitle: React.FC<{ titleKey: TranslationKeys; children: React.ReactNode }> = ({ titleKey, children }) => {
+  const { settings } = useApp();
+  const lang: Language = settings?.language === 'ar' ? 'ar' : 'en';
+  const t = translations[lang];
+  return <RouteTitle title={t[titleKey]}>{children}</RouteTitle>;
+};
+
+const LocalizedPublicTitle: React.FC<{ titleKey: TranslationKeys; children: React.ReactNode }> = ({ titleKey, children }) => {
+  const lang = readPublicLanguage() ?? 'en';
+  const t = translations[lang];
+  return <RouteTitle title={t[titleKey]}>{children}</RouteTitle>;
+};
 
 const DashboardLayout = React.lazy(() => import('./components/Layout/DashboardLayout').then(m => ({ default: m.DashboardLayout })));
 const Dashboard = React.lazy(() => import('./components/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -237,9 +250,9 @@ export const App: React.FC = () => {
               <Routes>
                 <Route path="/" element={
                   <GuestOnlyRoute>
-                    <RouteTitle title="Dental Clinic Management">
+                    <LocalizedPublicTitle titleKey="appTagline">
                       <LandingPage />
-                    </RouteTitle>
+                    </LocalizedPublicTitle>
                   </GuestOnlyRoute>
                 } />
                 <Route path="/login" element={
@@ -249,33 +262,33 @@ export const App: React.FC = () => {
                 } />
 
                 <Route element={<ProtectedAdminRoute />}>
-                  <Route path="/admin/dashboard" element={<RouteTitle title="Dashboard"><Dashboard /></RouteTitle>} />
-                  <Route path="/admin/calendar" element={<RouteTitle title="Appointments Calendar"><SmartCalendar /></RouteTitle>} />
-                  <Route path="/admin/waitlist" element={<RouteTitle title="Waitlist"><WaitlistQueue /></RouteTitle>} />
-                  <Route path="/admin/customers" element={<RouteTitle title="Patients"><CustomerDatabase /></RouteTitle>} />
-                  <Route path="/admin/leads" element={<RouteTitle title="Patient Inquiries"><LeadsPipeline /></RouteTitle>} />
-                  <Route path="/admin/services" element={<RouteTitle title="Dental Services"><ServicesManagement /></RouteTitle>} />
-                  <Route path="/admin/employees" element={<RouteTitle title="Doctors"><EmployeeManagement /></RouteTitle>} />
-                  <Route path="/admin/reports" element={<RequireRole role="owner"><RouteTitle title="Reports"><Reports /></RouteTitle></RequireRole>} />
-                  <Route path="/admin/settings" element={<RequireRole role="owner"><RouteTitle title="Settings"><Settings /></RouteTitle></RequireRole>} />
-                  <Route path="/admin/users" element={<RequireRole role="owner"><RouteTitle title="Staff Accounts"><UserManagement /></RouteTitle></RequireRole>} />
+                  <Route path="/admin/dashboard" element={<LocalizedAdminTitle titleKey="dashboard"><Dashboard /></LocalizedAdminTitle>} />
+                  <Route path="/admin/calendar" element={<LocalizedAdminTitle titleKey="calendar"><SmartCalendar /></LocalizedAdminTitle>} />
+                  <Route path="/admin/waitlist" element={<LocalizedAdminTitle titleKey="waitlist"><WaitlistQueue /></LocalizedAdminTitle>} />
+                  <Route path="/admin/customers" element={<LocalizedAdminTitle titleKey="customers"><CustomerDatabase /></LocalizedAdminTitle>} />
+                  <Route path="/admin/leads" element={<LocalizedAdminTitle titleKey="leads"><LeadsPipeline /></LocalizedAdminTitle>} />
+                  <Route path="/admin/services" element={<LocalizedAdminTitle titleKey="services"><ServicesManagement /></LocalizedAdminTitle>} />
+                  <Route path="/admin/employees" element={<LocalizedAdminTitle titleKey="employees"><EmployeeManagement /></LocalizedAdminTitle>} />
+                  <Route path="/admin/reports" element={<RequireRole role="owner"><LocalizedAdminTitle titleKey="reports"><Reports /></LocalizedAdminTitle></RequireRole>} />
+                  <Route path="/admin/settings" element={<RequireRole role="owner"><LocalizedAdminTitle titleKey="settings"><Settings /></LocalizedAdminTitle></RequireRole>} />
+                  <Route path="/admin/users" element={<RequireRole role="owner"><LocalizedAdminTitle titleKey="staffAccounts"><UserManagement /></LocalizedAdminTitle></RequireRole>} />
                 </Route>
 
                 <Route path="/privacy" element={
-                  <RouteTitle title="Privacy">
+                  <LocalizedPublicTitle titleKey="privacyTitle">
                     <PrivacyPage />
-                  </RouteTitle>
+                  </LocalizedPublicTitle>
                 } />
                 <Route path="/book/:slug" element={
-                  <RouteTitle title="Book Appointment">
+                  <LocalizedPublicTitle titleKey="bookAppointment">
                     <BookingPortal />
-                  </RouteTitle>
+                  </LocalizedPublicTitle>
                 } />
 
                 <Route path="*" element={
-                  <RouteTitle title="Page Not Found">
+                  <LocalizedPublicTitle titleKey="pageNotFound">
                     <NotFoundPage />
-                  </RouteTitle>
+                  </LocalizedPublicTitle>
                 } />
               </Routes>
             </Suspense>

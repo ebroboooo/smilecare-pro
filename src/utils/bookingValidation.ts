@@ -1,4 +1,21 @@
 import type { Employee, EmployeeSchedule, Reservation } from '../types';
+import { translations } from './translations';
+
+export type BookingValidationCopy = Pick<
+  typeof translations.en,
+  | 'bookingErrSelectDoctor'
+  | 'bookingErrSelectService'
+  | 'bookingErrSelectDate'
+  | 'bookingErrPastDate'
+  | 'bookingErrSelectTime'
+  | 'bookingErrDoctorUnavailable'
+  | 'bookingErrSlotBooked'
+  | 'bookingErrNameRequired'
+  | 'bookingErrPhoneRequired'
+  | 'bookingErrPhoneInvalid'
+  | 'bookingErrEmailRequired'
+  | 'bookingErrEmailInvalid'
+>;
 
 export function isPastDate(dateStr: string): boolean {
   const today = new Date();
@@ -153,27 +170,28 @@ export function validateBookingForm(
   },
   employee: Employee | undefined,
   duration: number,
-  reservations: Reservation[]
+  reservations: Reservation[],
+  t: BookingValidationCopy
 ): BookingFormErrors {
   const errors: BookingFormErrors = {};
 
-  if (!data.doctorId) errors.doctor = 'Please select a doctor';
-  if (!data.serviceId) errors.service = 'Please select a dental service';
-  if (!data.date) errors.date = 'Please select a date';
-  else if (isPastDate(data.date)) errors.date = 'Cannot book appointments in the past';
-  if (!data.time) errors.time = 'Please select a time slot';
+  if (!data.doctorId) errors.doctor = t.bookingErrSelectDoctor;
+  if (!data.serviceId) errors.service = t.bookingErrSelectService;
+  if (!data.date) errors.date = t.bookingErrSelectDate;
+  else if (isPastDate(data.date)) errors.date = t.bookingErrPastDate;
+  if (!data.time) errors.time = t.bookingErrSelectTime;
   else if (employee && data.date) {
     if (!isDoctorAvailable(employee, data.date, data.time, duration)) {
-      errors.time = 'Selected doctor is not available at this time';
+      errors.time = t.bookingErrDoctorUnavailable;
     } else if (isSlotBooked(reservations, employee.id, data.date, data.time, duration)) {
-      errors.time = 'This time slot is already booked';
+      errors.time = t.bookingErrSlotBooked;
     }
   }
-  if (!data.name.trim()) errors.name = 'Full name is required';
-  if (!data.phone.trim()) errors.phone = 'Phone number is required';
-  else if (!validatePhone(data.phone)) errors.phone = 'Please enter a valid phone number';
-  if (!data.email.trim()) errors.email = 'Email is required';
-  else if (!validateEmail(data.email)) errors.email = 'Please enter a valid email address';
+  if (!data.name.trim()) errors.name = t.bookingErrNameRequired;
+  if (!data.phone.trim()) errors.phone = t.bookingErrPhoneRequired;
+  else if (!validatePhone(data.phone)) errors.phone = t.bookingErrPhoneInvalid;
+  if (!data.email.trim()) errors.email = t.bookingErrEmailRequired;
+  else if (!validateEmail(data.email)) errors.email = t.bookingErrEmailInvalid;
 
   return errors;
 }

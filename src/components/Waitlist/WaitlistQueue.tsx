@@ -4,10 +4,21 @@ import { db, DEMO_MODE } from '../../db';
 import { api, ApiError } from '../../db/api';
 import { Clock, Plus, Trash2, ArrowUpRight } from 'lucide-react';
 import { CLINIC_ID, type WaitlistRecord } from '../../types';
+import { translations } from '../../utils/translations';
 
 export const WaitlistQueue: React.FC = () => {
   const { waitlist, customers, services, employees, branches, refreshData, dispatchAuditLog, selectedBranchId, settings } = useApp();
-  
+  const t = translations[settings?.language === 'ar' ? 'ar' : 'en'];
+
+  const slotLabel = (pref: WaitlistRecord['timeSlotPreference']) => {
+    const base =
+      pref === 'Morning' ? t.morning :
+      pref === 'Afternoon' ? t.afternoon :
+      pref === 'Evening' ? t.evening :
+      t.anyTime;
+    return `${base} ${t.slotPreferenceSuffix}`;
+  };
+
   const [modalOpen, setModalOpen] = useState(false);
   const [promoteError, setPromoteError] = useState('');
   const [formData, setFormData] = useState({
@@ -70,12 +81,12 @@ export const WaitlistQueue: React.FC = () => {
       }
       await refreshData();
     } catch (err) {
-      setPromoteError(err instanceof ApiError ? err.message : 'Could not promote this waitlist entry');
+      setPromoteError(err instanceof ApiError ? err.message : t.couldNotPromote);
     }
   };
 
   const handleCancel = async (id: string) => {
-    if (window.confirm("Remove this customer from the waitlist?")) {
+    if (window.confirm(t.removeWaitlistConfirm)) {
       const org = CLINIC_ID;
       await db.waitlist.update(org, id, { status: 'Cancelled' });
       await dispatchAuditLog("Waitlist Cancelled", `Cancelled waitlist entry ID ${id}`);
@@ -86,8 +97,9 @@ export const WaitlistQueue: React.FC = () => {
   if (settings?.features?.waitlistEnabled === false) {
     return (
       <div className="panel p-6">
-        <h2 className="text-xl font-bold text-slate-900">Waitlist</h2>
-        <p className="text-sm text-slate-500 mt-2">The waitlist is turned off in clinic settings.</p>
+        <h2 className="text-xl font-bold text-slate-900">{t.waitlist}</h2>
+        <p className="text-sm text-slate-500 mt-2">{t.waitlistOff}</p>
+        <p className="text-sm text-slate-500 mt-1">{t.waitlistOffHelp}</p>
       </div>
     );
   }
@@ -97,8 +109,8 @@ export const WaitlistQueue: React.FC = () => {
       
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Waitlist Queue Management</h2>
-          <p className="text-xs text-slate-500">Track and promote clients waiting for schedule openings</p>
+          <h2 className="text-xl font-bold text-slate-900">{t.waitlist}</h2>
+          <p className="text-xs text-slate-500">{t.waitlistHelp}</p>
         </div>
         
         <button 
@@ -106,7 +118,7 @@ export const WaitlistQueue: React.FC = () => {
           className="btn-primary px-3 py-2 text-xs flex items-center gap-1.5"
         >
           <Plus className="h-4 w-4" />
-          <span>Add to Waitlist</span>
+          <span>{t.addToWaitlist}</span>
         </button>
       </div>
 
@@ -115,8 +127,8 @@ export const WaitlistQueue: React.FC = () => {
       {filteredWaitlist.length === 0 ? (
         <div className="card p-12 text-center border-slate-200 rounded-2xl">
           <Clock className="h-10 w-10 text-slate-500 mx-auto mb-3" />
-          <h4 className="text-sm font-bold text-slate-700">Waitlist is currently empty</h4>
-          <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">Clients added to the queue will appear here. When bookings are cancelled, you can promote them instantly.</p>
+          <h4 className="text-sm font-bold text-slate-700">{t.waitlistEmpty}</h4>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">{t.waitlistEmptyHelp}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -131,16 +143,16 @@ export const WaitlistQueue: React.FC = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <span className="text-[10px] font-bold text-brand-600 bg-brand-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      {item.timeSlotPreference} Preference
+                      {slotLabel(item.timeSlotPreference)}
                     </span>
                     <span className="text-[10px] text-slate-500 font-semibold">{item.date}</span>
                   </div>
 
                   <div>
-                    <h4 className="font-bold text-slate-900 text-sm">{cust?.fullName || 'Unknown Patient'}</h4>
+                    <h4 className="font-bold text-slate-900 text-sm">{cust?.fullName || `${t.unknown} ${t.patient}`}</h4>
                     <p className="text-xs text-slate-400 font-semibold mt-0.5">{srv?.name}</p>
                     <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                      <span>Preferred Doctor: {emp?.name || 'Any Available'}</span>
+                      <span>{t.preferredDoctor}: {emp?.name || t.anyDoctor}</span>
                     </p>
                   </div>
 
@@ -160,7 +172,7 @@ export const WaitlistQueue: React.FC = () => {
                     <button
                       onClick={() => handleCancel(item.id)}
                       className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs"
-                      title="Cancel Waitlist"
+                      title={t.removeWaitlistConfirm}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -169,7 +181,7 @@ export const WaitlistQueue: React.FC = () => {
                       className="bg-brand-500/10 hover:bg-brand-500/20 text-brand-700 text-xs px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 border border-brand-500/20"
                     >
                       <ArrowUpRight className="h-3.5 w-3.5" />
-                      <span>Promote</span>
+                      <span>{t.promoteToBooking}</span>
                     </button>
                   </div>
                 </div>
@@ -179,15 +191,14 @@ export const WaitlistQueue: React.FC = () => {
         </div>
       )}
 
-      {/* Add to Waitlist Modal Dialog */}
       {modalOpen && (
         <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95 duration-150">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Add to Waitlist</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">{t.addToWaitlist}</h3>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Patient</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.patient}</label>
                 <select
                   value={formData.customerId}
                   onChange={(e) => setFormData(prev => ({ ...prev, customerId: e.target.value }))}
@@ -200,7 +211,7 @@ export const WaitlistQueue: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Service</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.service}</label>
                 <select
                   value={formData.serviceId}
                   onChange={(e) => setFormData(prev => ({ ...prev, serviceId: e.target.value }))}
@@ -213,13 +224,13 @@ export const WaitlistQueue: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Preferred Staff</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.preferredDoctor}</label>
                 <select
                   value={formData.employeeId}
                   onChange={(e) => setFormData(prev => ({ ...prev, employeeId: e.target.value }))}
                   className="w-full input-field text-xs"
                 >
-                  <option value="">Any Staff</option>
+                  <option value="">{t.anyDoctor}</option>
                   {employees.map(e => (
                     <option key={e.id} value={e.id}>{e.name}</option>
                   ))}
@@ -228,7 +239,7 @@ export const WaitlistQueue: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Date</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.date}</label>
                   <input
                     type="date"
                     value={formData.date}
@@ -237,28 +248,28 @@ export const WaitlistQueue: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Slot Preference</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.timeOfDay}</label>
                   <select
                     value={formData.timeSlotPreference}
-                    onChange={(e) => setFormData(prev => ({ ...prev, timeSlotPreference: e.target.value as any }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, timeSlotPreference: e.target.value as typeof formData.timeSlotPreference }))}
                     className="w-full input-field text-xs"
                   >
-                    <option value="Any">Any Time</option>
-                    <option value="Morning">Morning (09:00 - 12:00)</option>
-                    <option value="Afternoon">Afternoon (12:00 - 15:00)</option>
-                    <option value="Evening">Evening (15:00 - 18:00)</option>
+                    <option value="Any">{t.anyTime}</option>
+                    <option value="Morning">{t.morningSlot}</option>
+                    <option value="Afternoon">{t.afternoonSlot}</option>
+                    <option value="Evening">{t.eveningSlot}</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Notes</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.notes}</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
                   className="w-full input-field text-xs"
-                  placeholder="E.g., urgent booking, VIP customer..."
+                  placeholder={t.waitlistNotesPlaceholder}
                 />
               </div>
 
@@ -268,13 +279,13 @@ export const WaitlistQueue: React.FC = () => {
                   onClick={() => setModalOpen(false)}
                   className="btn-secondary px-4 py-2 text-xs"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary px-4 py-2 text-xs"
                 >
-                  Add to Queue
+                  {t.addToQueue}
                 </button>
               </div>
             </form>

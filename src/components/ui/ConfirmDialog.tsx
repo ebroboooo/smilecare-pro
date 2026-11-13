@@ -10,6 +10,7 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  pleaseWaitLabel?: string;
   variant?: 'danger' | 'warning' | 'info';
   isLoading?: boolean;
 }
@@ -20,8 +21,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel = '',
+  cancelLabel = '',
+  pleaseWaitLabel = '',
   variant = 'danger',
   isLoading = false,
 }) => {
@@ -37,7 +39,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <>
           <button onClick={onClose} className="btn-secondary" disabled={isLoading}>{cancelLabel}</button>
           <button onClick={onConfirm} className={btnClass} disabled={isLoading}>
-            {isLoading ? 'Processing...' : confirmLabel}
+            {isLoading ? pleaseWaitLabel : confirmLabel}
           </button>
         </>
       }

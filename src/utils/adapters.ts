@@ -8,11 +8,12 @@ export class EnterpriseNotificationHub {
     customerName: string,
     serviceName: string,
     _employeeName: string,
+    copy?: { title: string; message: string },
   ) {
     await db.notifications.create(orgId, {
       branchId: reservation.branchId,
-      title: 'Appointment booked',
-      message: `${customerName} booked ${serviceName} on ${reservation.date} at ${reservation.time}.`,
+      title: copy?.title || 'Appointment booked',
+      message: copy?.message || `${customerName} booked ${serviceName} on ${reservation.date} at ${reservation.time}.`,
       read: false,
       type: 'BookingCreated',
     });

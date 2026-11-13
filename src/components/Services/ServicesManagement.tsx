@@ -132,14 +132,14 @@ export const ServicesManagement: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-4 text-xs font-semibold text-slate-700 pt-1">
-                <span className="flex items-center gap-1"><Clock className="h-4 w-4 text-brand-600" /> {srv.duration} min</span>
+                <span className="flex items-center gap-1"><Clock className="h-4 w-4 text-brand-600" /> {srv.duration} {t.minutesShort}</span>
                 <span className="flex items-center gap-1"><DollarSign className="h-4 w-4 text-green-500" /> {srv.price} {currency}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between gap-3 mt-6 pt-3 border-t border-slate-200">
               <span className="text-[10px] text-slate-500 font-medium">
-                Active in {srv.branchIds?.length || 0} branches
+                {t.activeIn} {srv.branchIds?.length || 0} {t.locations}
               </span>
               
               <div className="flex items-center gap-1.5">
@@ -166,12 +166,12 @@ export const ServicesManagement: React.FC = () => {
         <div className="fixed inset-0 bg-slate-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 shadow-2xl relative animate-in zoom-in-95 duration-150">
             <h3 className="text-lg font-bold text-slate-900 mb-4">
-              {formData.id ? 'Edit Service' : 'Add Dental Service'}
+              {formData.id ? t.editService : t.addService}
             </h3>
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Service Name</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.serviceName}</label>
                 <input
                   type="text"
                   required
@@ -182,7 +182,7 @@ export const ServicesManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Category</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.category}</label>
                 <input
                   type="text"
                   required
@@ -194,7 +194,7 @@ export const ServicesManagement: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Duration (minutes)</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.duration}</label>
                   <input
                     type="number"
                     required
@@ -204,7 +204,7 @@ export const ServicesManagement: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Price ({currency})</label>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.price} ({currency})</label>
                   <input
                     type="number"
                     required
@@ -216,7 +216,7 @@ export const ServicesManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Description</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.description}</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -226,7 +226,7 @@ export const ServicesManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Branch Scope Assignment</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.offeredAt}</label>
                 <div className="space-y-2 mt-2 max-h-24 overflow-y-auto border border-slate-200 p-2 rounded-xl">
                   {branches.map(b => (
                     <label key={b.id} className="flex items-center gap-2 text-xs font-semibold text-slate-700 select-none cursor-pointer">
@@ -243,14 +243,14 @@ export const ServicesManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Status</label>
+                <label className="block text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">{t.status}</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
                   className="w-full input-field text-xs"
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="Active">{t.active}</option>
+                  <option value="Inactive">{t.inactive}</option>
                 </select>
               </div>
 
@@ -260,13 +260,13 @@ export const ServicesManagement: React.FC = () => {
                   onClick={() => setModalOpen(false)}
                   className="btn-secondary px-4 py-2 text-xs"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   className="btn-primary px-4 py-2 text-xs"
                 >
-                  Save Service
+                  {t.saveService}
                 </button>
               </div>
             </form>

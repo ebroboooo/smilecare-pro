@@ -1,4 +1,6 @@
 import React from 'react';
+import { translations } from '../../utils/translations';
+import { readPublicLanguage } from '../../utils/publicLanguage';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -19,8 +21,12 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   </div>
 );
 
-export const PageLoader: React.FC = () => (
-  <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-    <LoadingSpinner size="lg" label="Loading..." />
-  </div>
-);
+export const PageLoader: React.FC = () => {
+  const lang = readPublicLanguage() ?? 'en';
+  const t = translations[lang];
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <LoadingSpinner size="lg" label={t.loading} />
+    </div>
+  );
+};
