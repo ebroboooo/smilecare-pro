@@ -231,7 +231,7 @@ export const SmartCalendar: React.FC = () => {
 
   const handleDelete = async () => {
     if (!formData.id) return;
-    if (window.confirm("Are you sure you want to cancel and delete this reservation?")) {
+    if (window.confirm(t.confirmDeleteReservation)) {
       const org = CLINIC_ID;
       // Promote from waitlist if applicable
       const matchingWaitlist = waitlist.find(w => 
@@ -652,10 +652,10 @@ export const SmartCalendar: React.FC = () => {
                     onChange={handleFormChange}
                     className="w-full input-field text-xs"
                   >
-                    <option value="Unpaid">Unpaid</option>
-                    <option value="Authorized">Authorized Hold</option>
-                    <option value="Paid">Fully Paid</option>
-                    <option value="Refunded">Refunded Transaction</option>
+                    <option value="Unpaid">{t.paymentUnpaid}</option>
+                    <option value="Authorized">{t.paymentAuthorized}</option>
+                    <option value="Paid">{t.paymentPaid}</option>
+                    <option value="Refunded">{t.paymentRefunded}</option>
                   </select>
                 </div>
               </div>
@@ -681,10 +681,10 @@ export const SmartCalendar: React.FC = () => {
                         type="button"
                         onClick={handleDuplicate}
                         className="bg-slate-100 border border-slate-300 text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl text-xs flex items-center gap-1"
-                        title="Duplicate booking for tomorrow"
+                        title={t.duplicate}
                       >
                         <Copy className="h-3.5 w-3.5" />
-                        <span>Duplicate</span>
+                        <span>{t.duplicate}</span>
                       </button>
                       <button
                         type="button"
@@ -692,7 +692,7 @@ export const SmartCalendar: React.FC = () => {
                         className="bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 px-3 py-2 rounded-xl text-xs flex items-center gap-1"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        <span>Cancel Booking</span>
+                        <span>{t.cancelBooking}</span>
                       </button>
                     </>
                   )}
@@ -704,13 +704,13 @@ export const SmartCalendar: React.FC = () => {
                     onClick={() => setModalOpen(false)}
                     className="btn-secondary px-4 py-2 text-xs"
                   >
-                    Close
+                    {t.close}
                   </button>
                   <button
                     type="submit"
                     className="btn-primary px-4 py-2 text-xs"
                   >
-                    {formData.id ? 'Save changes' : 'Create Book'}
+                    {formData.id ? t.saveChanges : t.createBook}
                   </button>
                 </div>
               </div>

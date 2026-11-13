@@ -143,6 +143,13 @@ describe('phase 1 auth and persistence', () => {
       phone: '01000000000',
       email: 'blocked@example.com',
     })).status).toBe(403);
+
+    const settings = await doctor.get('/api/settings');
+    expect(settings.status).toBe(200);
+    expect(settings.body.businessName).toBeTruthy();
+    expect(settings.body.telegramChatId).toBeUndefined();
+    expect(settings.body.telegramTokenSet).toBeUndefined();
+    expect(settings.body.whatsappPhoneNumberId).toBeUndefined();
   });
 
   it('persists a patient and appointment across a database reopen', async () => {

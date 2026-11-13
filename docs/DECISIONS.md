@@ -55,3 +55,10 @@
 - WhatsApp Cloud API credentials (phone number ID, business account ID, test recipient, access token) are stored on the server. The token is not returned to the browser.
 - A WhatsApp or Telegram test is `delivered: true` only after the provider accepts it. The automated test runner does not call Meta or Telegram and returns 501 for the WhatsApp test route. A fake token against the live adapter returns 502 and is not recorded as sent.
 - Patient WhatsApp reminders are not sent. The settings screen says coming soon. Only the explicit test button calls Meta, and only to the number the owner typed.
+
+## 2026-11-12 — Post-review fixes
+
+- Install docs use a portable `<path-to-this-repo>` instead of a fixed `E:\Projects\...` path. Added `docs/API.md`, `docs/BACKUP_RESTORE.md`, and `CHANGELOG.md`.
+- `GET /api/settings` still returns branding and booking rules to every signed-in role. Telegram and WhatsApp connection fields are returned only to the owner.
+- Calendar appointment dialog strings (save, cancel booking, payment status) use the translation tables for Arabic and English.
+- `npm audit fix` (no `--force`) reduced open advisories to one High: `zod` (upgrade to v4 is breaking and was deferred). The previous Critical tinypool/vitest and most High toolchain items were cleared by the safe fix.

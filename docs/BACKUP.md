@@ -1,5 +1,7 @@
 # Backup and restore
 
+Full restore steps: **`docs/BACKUP_RESTORE.md`**.
+
 The clinic database is one SQLite file. The default path is `server/data/smilecare.db`.
 
 ## Copy

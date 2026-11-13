@@ -35,7 +35,7 @@ npm start
 
 `start.bat` and `start.sh` install dependencies, build, and start the API. In production the API also serves the built website.
 
-See `docs/DEPLOY.md` for Docker and a Caddy sample, and `docs/BACKUP.md` for the database copy.
+See `docs/DEPLOY.md` for Docker and a Caddy sample, and `docs/BACKUP_RESTORE.md` for the database copy.
 
 ## Demo mode
 

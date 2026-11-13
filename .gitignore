@@ -18,6 +18,8 @@ server/.env
 *.db-wal
 dist-ssr
 *.local
+.tmp/
+scratch/
 
 # Editor directories and files
 .vscode/*

@@ -2,10 +2,12 @@
 
 One clinic, one computer or one server. Node.js 22.
 
+Prefer installing Node and npm caches on a drive with free space (this project lives on `E:`). A nearly full `C:` drive can make `npm install` fail with `ENOSPC`.
+
 ## English
 
 ```powershell
-cd E:\Projects\Project2_reservation_system
+cd <path-to-this-repo>
 powershell -File scripts\setup-clinic.ps1
 npm install
 npm run dev
@@ -24,7 +26,7 @@ npm start
 
 Set `SESSION_SECRET` in `server/.env` to a unique value of at least 32 characters before `NODE_ENV=production`. The sample secret is refused in production.
 
-Copy the database with `docs/BACKUP.md`. Docker and a web server sample are in `docs/DEPLOY.md`.
+Copy the database with `docs/BACKUP_RESTORE.md`. Docker and a web server sample are in `docs/DEPLOY.md`.
 
 Do not turn on demo mode (`VITE_DEMO_MODE=true`) for real patients. That mode keeps data in the browser only.
 
@@ -32,8 +34,10 @@ Do not turn on demo mode (`VITE_DEMO_MODE=true`) for real patients. That mode ke
 
 عيادة واحدة، جهاز واحد أو خادم واحد. يلزم Node.js 22.
 
+يفضّل تثبيت Node وذاكرة npm المؤقتة على قرص فيه مساحة كافية. امتلاء قرص النظام (`C:`) قد يوقف `npm install` برسالة نفاد المساحة.
+
 ```powershell
-cd E:\Projects\Project2_reservation_system
+cd <path-to-this-repo>
 powershell -File scripts\setup-clinic.ps1
 npm install
 npm run dev
@@ -52,6 +56,6 @@ npm start
 
 ضع `SESSION_SECRET` في `server/.env` بقيمة خاصة لا تقل عن ٣٢ حرفاً قبل تشغيل الإنتاج. السر التجريبي يُرفض في الإنتاج.
 
-انسخ قاعدة البيانات حسب `docs/BACKUP.md`. مثال Docker وخادم الويب في `docs/DEPLOY.md`.
+انسخ قاعدة البيانات حسب `docs/BACKUP_RESTORE.md`. مثال Docker وخادم الويب في `docs/DEPLOY.md`.
 
 لا تفعّل الوضع التجريبي (`VITE_DEMO_MODE=true`) لمرضى حقيقيين. ذلك الوضع يبقي البيانات في المتصفح فقط.

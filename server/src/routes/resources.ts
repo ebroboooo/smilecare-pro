@@ -1282,8 +1282,28 @@ clinicRouter.delete('/notifications/:id', staffWrite, (req, res) => {
   res.json(true);
 });
 
-clinicRouter.get('/settings', (_req, res) => {
-  res.json(readSettings());
+clinicRouter.get('/settings', (req, res) => {
+  const settings = readSettings();
+  if (req.user?.role === 'owner') {
+    res.json(settings);
+    return;
+  }
+  // Receptionists and doctors need branding/language/rules for the UI,
+  // but must not see messaging identifiers or token presence flags.
+  const {
+    telegramChatId: _chat,
+    telegramEnabled: _tgOn,
+    telegramTokenSet: _tgTok,
+    telegramBotUsername: _tgUser,
+    telegramReminderHours: _tgHours,
+    whatsappPhoneNumberId: _waPhone,
+    whatsappBusinessAccountId: _waBiz,
+    whatsappTestRecipient: _waTo,
+    whatsappTokenSet: _waTok,
+    whatsappLastStatus: _waStatus,
+    ...safe
+  } = settings;
+  res.json(safe);
 });
 
 const settingsPatch = z.object({

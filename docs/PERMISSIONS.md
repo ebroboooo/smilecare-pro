@@ -9,6 +9,8 @@ Roles are `owner`, `receptionist`, and `doctor`. Every API route below is enforc
 | Create and deactivate staff | Yes | No | No |
 | Reset another person's password | Yes | No | No |
 | Change clinic settings | Yes | No | No |
+| Read clinic branding / language / booking rules | Yes | Yes | Yes |
+| Read Telegram / WhatsApp connection fields | Yes | No | No |
 | Read patients, doctors, services, branches | Yes | Yes | Yes |
 | Create or edit patients | Yes | Yes | No |
 | Create or edit appointments | Yes | Yes | No |
