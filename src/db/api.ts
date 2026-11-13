@@ -23,7 +23,14 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) as { error?: { code?: string; message?: string } } : null;
+  let data: { error?: { code?: string; message?: string } } | null = null;
+  if (text) {
+    try {
+      data = JSON.parse(text) as { error?: { code?: string; message?: string } };
+    } catch {
+      throw new ApiError(response.status || 502, 'BAD_RESPONSE', 'The server returned an unexpected response');
+    }
+  }
   if (!response.ok) {
     throw new ApiError(response.status, data?.error?.code || 'HTTP', data?.error?.message || 'Request failed');
   }

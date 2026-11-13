@@ -67,8 +67,8 @@ const Login: React.FC = () => {
   const { login, setup, currentUser, needsSetup } = useAuth();
   const navigate = useNavigate();
   const [lang, setLang] = useState<Language>(() => readPublicLanguage() ?? 'en');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(() => (DEMO_MODE ? 'owner@smilecare.demo' : ''));
+  const [password, setPassword] = useState(() => (DEMO_MODE ? 'demo123' : ''));
   const [name, setName] = useState('');
   const [businessName, setBusinessName] = useState('SmileCare Dental Clinic');
   const [isSubmitting, setIsSubmitting] = useState(false);

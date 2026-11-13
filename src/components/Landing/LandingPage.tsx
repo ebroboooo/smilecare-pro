@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, ChevronDown, Mail, MapPin, Menu, Phone, Smile, X } from 'lucide-react';
 import { api, toQuery } from '../../db/api';
-import { DEMO_MODE } from '../../db';
-import { DEFAULT_PUBLIC_BOOKING_SLUG } from '../../types';
+import { DEMO_MODE, db } from '../../db';
+import { getPresetSeeds, mockDbInstance } from '../../db/mockRepository';
+import { CLINIC_ID, DEFAULT_PUBLIC_BOOKING_SLUG } from '../../types';
 import { translations, type Language } from '../../utils/translations';
 import { formatMoney } from '../../utils/locale';
 import { applyDocumentLanguage, readPublicLanguage, writePublicLanguage } from '../../utils/publicLanguage';
@@ -58,8 +59,51 @@ export const LandingPage: React.FC = () => {
     setLang(next);
   };
 
+  const applyDemoCatalog = () => {
+    const seeds = getPresetSeeds(CLINIC_ID);
+    setClinic({
+      businessName: seeds.settings.businessName,
+      publicSlug: seeds.settings.publicSlug || DEFAULT_PUBLIC_BOOKING_SLUG,
+      address: seeds.settings.address,
+      phone: seeds.settings.phone,
+      email: seeds.settings.email,
+      currency: seeds.settings.currency,
+      language: seeds.settings.language,
+      publicBookingEnabled: seeds.settings.features.publicBookingEnabled !== false,
+      branches: seeds.branches.map((branch) => ({
+        id: Number(String(branch.id).replace(/\D/g, '') || 1) || 1,
+        name: branch.name,
+        address: branch.address,
+        phone: branch.phone,
+      })),
+    });
+    setServices(
+      seeds.services
+        .filter((service) => service.status === 'Active')
+        .map((service, index) => ({
+          id: index + 1,
+          name: service.name,
+          description: service.description,
+          duration: service.duration,
+          price: service.price,
+        })),
+    );
+    setDoctors(
+      seeds.employees
+        .filter((employee) => employee.status === 'Active')
+        .map((employee, index) => ({
+          id: index + 1,
+          name: employee.name,
+          role: employee.role,
+        })),
+    );
+  };
+
   useEffect(() => {
-    if (DEMO_MODE) return;
+    if (DEMO_MODE) {
+      applyDemoCatalog();
+      return;
+    }
     api<PublicClinic>('/api/public/clinic')
       .then((data) => {
         setClinic(data);
@@ -69,7 +113,10 @@ export const LandingPage: React.FC = () => {
         api<PublicService[]>(`/api/public/services${toQuery({ branchId })}`).then(setServices).catch(() => setServices([]));
         api<PublicDoctor[]>(`/api/public/doctors${toQuery({ branchId })}`).then(setDoctors).catch(() => setDoctors([]));
       })
-      .catch(() => setClinic(null));
+      .catch(() => {
+        // Public marketing page should never look empty if the API is offline.
+        applyDemoCatalog();
+      });
   }, []);
 
   const nav = [
@@ -83,7 +130,23 @@ export const LandingPage: React.FC = () => {
     event.preventDefault();
     setSendError('');
     if (DEMO_MODE) {
-      setSendError(copy.demoNoInquiry);
+      try {
+        mockDbInstance.load();
+        await db.leads.create(CLINIC_ID, {
+          branchId: 'br-main',
+          fullName: form.fullName,
+          phone: form.phone,
+          email: form.email,
+          source: 'Website',
+          status: 'New',
+          value: 0,
+          notes: form.message,
+        });
+        setSent(true);
+        setForm({ fullName: '', phone: '', email: '', message: '', companyWebsite: '' });
+      } catch {
+        setSendError(copy.couldNotSend);
+      }
       return;
     }
     try {
@@ -220,13 +283,13 @@ export const LandingPage: React.FC = () => {
           <form onSubmit={sendLead} className="card p-8 space-y-4">
             <input className="absolute opacity-0 h-0 w-0" tabIndex={-1} autoComplete="off" value={form.companyWebsite} onChange={(event) => setForm({ ...form, companyWebsite: event.target.value })} aria-hidden="true" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingFullName}</label>
-            <input className="input-field" required value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />
+            <input className="input-field" required value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} placeholder={copy.landingFullName} autoComplete="name" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingPhone}</label>
-            <input className="input-field" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+            <input className="input-field" required value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+20 100 000 0000" autoComplete="tel" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingEmail}</label>
-            <input className="input-field" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+            <input className="input-field" type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="name@example.com" autoComplete="email" />
             <label className="block text-xs font-semibold text-slate-500">{copy.landingMessage}</label>
-            <textarea className="input-field min-h-[100px]" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} />
+            <textarea className="input-field min-h-[100px]" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} placeholder={copy.landingMessage} />
             {sent ? <p className="text-sm text-emerald-700">{copy.landingSent}</p> : <button className="btn-primary w-full" type="submit">{copy.landingSend}</button>}
             {sendError && <p className="text-sm text-red-600">{sendError}</p>}
           </form>

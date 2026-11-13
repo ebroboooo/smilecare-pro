@@ -1,5 +1,23 @@
 # Deploy
 
+## Vercel (public demo website)
+
+Vercel hosts the **Vite SPA only**. The clinic API uses SQLite, better-sqlite3, and long-running Telegram/WhatsApp loops, so it does **not** run on Vercel serverless.
+
+Deploy the marketing/demo site with browser demo mode:
+
+```powershell
+npx vercel --prod --yes
+```
+
+Project env on Vercel (Production):
+
+- `VITE_DEMO_MODE=true`
+
+That build shows the demo banner and keeps data in the browser. It is not a real clinic install.
+
+For a real clinic, use Docker or `npm start` on a VPS (below) so the API and SQLite stay on one persistent host.
+
 ## Docker
 
 Create a `SESSION_SECRET` of at least 32 characters and do not commit it.

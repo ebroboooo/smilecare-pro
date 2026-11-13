@@ -194,6 +194,8 @@ export interface SystemSettings {
   isRtl: boolean;
   timezone: string;
   activePreset?: 'Dental';
+  /** Bumped when demo seed catalog changes so stale browser storage is replaced. */
+  seedVersion?: number;
   bookingRules: BookingRules;
   features: {
     waitlistEnabled: boolean;

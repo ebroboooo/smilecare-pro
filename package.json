@@ -11,6 +11,8 @@
     "dev:web": "vite",
     "dev:api": "npm run dev -w smilecare-server",
     "build": "tsc -b && vite build && npm run build -w smilecare-server",
+    "build:vercel": "tsc -b && vite build --mode demo",
+    "deploy:vercel": "vercel --prod --yes",
     "typecheck": "tsc -b --pretty false && npm run typecheck -w smilecare-server",
     "lint": "oxlint",
     "test": "npm run test -w smilecare-server",
@@ -38,6 +40,7 @@
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.1",
     "typescript": "~6.0.2",
+    "vercel": "^65.15.0",
     "vite": "^8.1.0",
     "vitest": "^3.2.4"
   }

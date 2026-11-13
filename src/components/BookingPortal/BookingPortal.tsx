@@ -22,6 +22,15 @@ export const BookingPortal: React.FC = () => {
   return <DemoBookingPortal />;
 };
 
+const nextWorkingDayIso = (): string => {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  do {
+    date.setDate(date.getDate() + 1);
+  } while (date.getDay() === 0 || date.getDay() === 6);
+  return date.toISOString().split('T')[0];
+};
+
 const DemoBookingPortal: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const { branches, services, employees, reservations, settings, refreshData, isLoading } = useApp();
@@ -30,7 +39,7 @@ const DemoBookingPortal: React.FC = () => {
   const [selBranch, setSelBranch] = useState('');
   const [selService, setSelService] = useState('');
   const [selEmployee, setSelEmployee] = useState('');
-  const [selDate, setSelDate] = useState(new Date(Date.now() + 86400000).toISOString().split('T')[0]);
+  const [selDate, setSelDate] = useState(nextWorkingDayIso);
   const [selTime, setSelTime] = useState('');
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -49,7 +58,7 @@ const DemoBookingPortal: React.FC = () => {
   const activeService = services.find(s => s.id === selService);
   const activeEmployee = employees.find(e => e.id === selEmployee);
   const activeBranch = branches.find(b => b.id === selBranch);
-  const currency = settings?.currency || 'USD';
+  const currency = settings?.currency || 'EGP';
   const todayStr = new Date().toISOString().split('T')[0];
 
   const availableDoctors = useMemo(() =>
@@ -197,7 +206,7 @@ const DemoBookingPortal: React.FC = () => {
                     <Briefcase className="h-3.5 w-3.5" /> Dental Service
                   </label>
                   <select value={selService} onChange={(e) => setSelService(e.target.value)} className="input-field">
-                    {availableServices.map(s => <option key={s.id} value={s.id}>{s.name} — ${s.price}</option>)}
+                    {availableServices.map(s => <option key={s.id} value={s.id}>{s.name} — {s.price} {currency}</option>)}
                   </select>
                   {errors.service && <p className="text-xs text-red-500 mt-1">{errors.service}</p>}
                 </div>
@@ -249,7 +258,7 @@ const DemoBookingPortal: React.FC = () => {
                     <h4 className="text-sm font-semibold text-slate-900">{activeService.name}</h4>
                     <p className="text-xs text-slate-500">{activeService.duration} min · Dr. {activeEmployee?.name?.replace('Dr. ', '')}</p>
                   </div>
-                  <span className="text-lg font-bold text-brand-700">${activeService.price}</span>
+                  <span className="text-lg font-bold text-brand-700">{activeService.price} {currency}</span>
                 </div>
               )}
 
@@ -265,23 +274,23 @@ const DemoBookingPortal: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Full Name *</label>
-                  <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} className="input-field" placeholder="John Doe" />
+                  <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} className="input-field" placeholder="Full name" />
                   {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">Phone Number *</label>
-                  <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="input-field" placeholder="+1 (555) 000-0000" />
+                  <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="input-field" placeholder="+20 100 000 0000" />
                   {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Email Address *</label>
-                <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className="input-field" placeholder="john@example.com" />
+                <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} className="input-field" placeholder="name@example.com" />
                 {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Notes (Optional)</label>
-                <textarea value={clientNotes} onChange={(e) => setClientNotes(e.target.value)} rows={3} className="input-field resize-y" placeholder="Allergies, dental anxiety, special requests..." />
+                <textarea value={clientNotes} onChange={(e) => setClientNotes(e.target.value)} rows={3} className="input-field resize-y" placeholder="Allergies, dental anxiety, or special requests" />
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="btn-secondary flex-1"><ArrowLeft className="h-4 w-4" /> Back</button>
@@ -294,10 +303,10 @@ const DemoBookingPortal: React.FC = () => {
             <form onSubmit={handleCheckout} className="space-y-5">
               <h3 className="font-semibold text-slate-900">Confirm & Pay</h3>
               <div className="p-4 bg-slate-50 border border-slate-100 rounded-xl space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">{activeService?.name}</span><span className="font-semibold">${activeService?.price}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">{activeService?.name}</span><span className="font-semibold">{activeService?.price} {currency}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Doctor</span><span>{activeEmployee?.name}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Date & Time</span><span className="font-semibold text-brand-700">{selDate} at {selTime}</span></div>
-                <div className="flex justify-between border-t border-slate-200 pt-2 font-bold"><span>Total</span><span className="text-brand-700">${activeService?.price} {currency}</span></div>
+                <div className="flex justify-between border-t border-slate-200 pt-2 font-bold"><span>Total</span><span className="text-brand-700">{activeService?.price} {currency}</span></div>
               </div>
 
               <p className="text-sm text-slate-600 bg-slate-50 border border-slate-100 rounded-xl p-3">Payment is collected at the clinic.</p>

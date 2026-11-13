@@ -61,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch {
       setCurrentUser(null);
+      setNeedsSetup(false);
     } finally {
       setIsLoading(false);
     }
@@ -70,15 +71,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const timer = window.setTimeout(() => {
       void refreshSession();
     }, 0);
-    return () => window.clearTimeout(timer);
+    const safety = window.setTimeout(() => setIsLoading(false), 4000);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(safety);
+    };
   }, [refreshSession]);
+
+  const loginDemo = (email: string, password: string) => {
+    if (!email.trim() || password.length < 4) {
+      throw new Error('Enter your email and a password of at least 4 characters.');
+    }
+    const user = { ...DEMO_USER, email: email.trim() };
+    sessionStorage.setItem('smilecare_demo_user', JSON.stringify(user));
+    setCurrentUser(user);
+    setNeedsSetup(false);
+  };
 
   const login = async (email: string, password: string) => {
     if (DEMO_MODE) {
-      if (!email.trim() || password.length < 4) throw new Error('Enter your email and a password of at least 4 characters.');
-      const user = { ...DEMO_USER, email: email.trim() };
-      sessionStorage.setItem('smilecare_demo_user', JSON.stringify(user));
-      setCurrentUser(user);
+      loginDemo(email, password);
       return;
     }
     try {
@@ -89,6 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(result.user);
       setNeedsSetup(false);
     } catch (error) {
+      // Static hosts (Vercel SPA) have no API — fall back to the browser demo session.
+      if (typeof window !== 'undefined' && /\.vercel\.app$/i.test(window.location.hostname)) {
+        loginDemo(email, password);
+        return;
+      }
       if (error instanceof ApiError) throw new Error(error.message);
       throw new Error('Unable to sign in. Please try again.');
     }

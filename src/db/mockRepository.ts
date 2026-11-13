@@ -34,8 +34,8 @@ const DEFAULT_ORG_ID = CLINIC_ID;
 // Standard preset data generator
 export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
   const branches: Branch[] = [
-    { id: "br-main", orgId, name: "SmileCare Downtown Clinic", address: "123 Medical Center Blvd, Suite 200", phone: "+1 (555) 100-2001", email: "downtown@smilecare.com", timezone: "UTC+3", isActive: true },
-    { id: "br-sub", orgId, name: "SmileCare North Side", address: "78 Wellness Plaza, Floor 3", phone: "+1 (555) 100-2002", email: "northside@smilecare.com", timezone: "UTC+3", isActive: true }
+    { id: "br-main", orgId, name: "SmileCare Zamalek", address: "12 Nile Corniche, Zamalek, Cairo", phone: "+20 100 880 9900", email: "zamalek@smilecare.com", timezone: "Africa/Cairo", isActive: true },
+    { id: "br-sub", orgId, name: "SmileCare New Cairo", address: "90 Street, Fifth Settlement, New Cairo", phone: "+20 100 880 9901", email: "newcairo@smilecare.com", timezone: "Africa/Cairo", isActive: true }
   ];
 
   const customers: Customer[] = [
@@ -59,16 +59,16 @@ export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
   };
 
   services = [
-    { id: "srv-1", orgId, branchIds: ["br-main", "br-sub"], name: "Dental Cleaning & Exam", description: "Professional teeth cleaning, polishing, and comprehensive oral examination.", duration: 45, price: 120, category: "Preventive", status: "Active" },
-    { id: "srv-2", orgId, branchIds: ["br-main"], name: "Root Canal Treatment", description: "Endodontic treatment to save an infected or damaged tooth.", duration: 90, price: 850, category: "Restorative", status: "Active" },
-    { id: "srv-3", orgId, branchIds: ["br-main", "br-sub"], name: "Teeth Whitening", description: "Professional in-office whitening for a brighter smile.", duration: 60, price: 350, category: "Cosmetic", status: "Active" },
-    { id: "srv-4", orgId, branchIds: ["br-main"], name: "Dental Implant Consultation", description: "Comprehensive evaluation and treatment plan for dental implants.", duration: 30, price: 75, category: "Surgical", status: "Active" },
-    { id: "srv-5", orgId, branchIds: ["br-main", "br-sub"], name: "Orthodontic Consultation", description: "Assessment for braces, aligners, and bite correction options.", duration: 45, price: 100, category: "Orthodontics", status: "Active" }
+    { id: "srv-1", orgId, branchIds: ["br-main", "br-sub"], name: "Dental Cleaning & Exam", description: "Professional teeth cleaning, polishing, and comprehensive oral examination.", duration: 45, price: 500, category: "Preventive", status: "Active" },
+    { id: "srv-2", orgId, branchIds: ["br-main"], name: "Root Canal Treatment", description: "Endodontic treatment to save an infected or damaged tooth.", duration: 90, price: 3500, category: "Restorative", status: "Active" },
+    { id: "srv-3", orgId, branchIds: ["br-main", "br-sub"], name: "Teeth Whitening", description: "Professional in-office whitening for a brighter smile.", duration: 60, price: 2200, category: "Cosmetic", status: "Active" },
+    { id: "srv-4", orgId, branchIds: ["br-main"], name: "Dental Implant Consultation", description: "Comprehensive evaluation and treatment plan for dental implants.", duration: 30, price: 400, category: "Surgical", status: "Active" },
+    { id: "srv-5", orgId, branchIds: ["br-main", "br-sub"], name: "Orthodontic Consultation", description: "Assessment for braces, aligners, and bite correction options.", duration: 45, price: 600, category: "Orthodontics", status: "Active" }
   ];
   employees = [
-    { id: "emp-1", orgId, branchIds: ["br-main", "br-sub"], name: "Dr. Amanda Ross", role: "General Dentist", email: "amanda@smilecare.com", phone: "+1 (555) 301-4401", status: "Active", schedule: defaultWeeklySchedule() },
-    { id: "emp-2", orgId, branchIds: ["br-main"], name: "Dr. Khalid Mansoor", role: "Orthodontist", email: "khalid@smilecare.com", phone: "+1 (555) 301-4402", status: "Active", schedule: defaultWeeklySchedule() },
-    { id: "emp-3", orgId, branchIds: ["br-main", "br-sub"], name: "Dr. Sarah Chen", role: "Pediatric Dentist", email: "sarah@smilecare.com", phone: "+1 (555) 301-4403", status: "Active", schedule: defaultWeeklySchedule() }
+    { id: "emp-1", orgId, branchIds: ["br-main", "br-sub"], name: "Dr. Sara Nabil", role: "General Dentist", email: "sara@smilecare.com", phone: "+20 100 301 4401", status: "Active", schedule: defaultWeeklySchedule() },
+    { id: "emp-2", orgId, branchIds: ["br-main"], name: "Dr. Khalid Mansoor", role: "Orthodontist", email: "khalid@smilecare.com", phone: "+20 100 301 4402", status: "Active", schedule: defaultWeeklySchedule() },
+    { id: "emp-3", orgId, branchIds: ["br-main", "br-sub"], name: "Dr. Nour Hassan", role: "Pediatric Dentist", email: "nour@smilecare.com", phone: "+20 100 301 4403", status: "Active", schedule: defaultWeeklySchedule() }
   ];
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -117,14 +117,15 @@ export const getPresetSeeds = (orgId: string = DEFAULT_ORG_ID) => {
     orgId,
     businessName: 'SmileCare Dental Clinic',
     publicSlug: DEFAULT_PUBLIC_BOOKING_SLUG,
-    address: "777 Medical Boulevard, Suite 500",
-    phone: "+1 (555) 880-9900",
+    address: '12 Nile Corniche, Zamalek, Cairo',
+    phone: '+20 100 880 9900',
     email: 'hello@smilecare.com',
-    currency: 'USD',
-    language: "en",
+    currency: 'EGP',
+    language: 'en',
     isRtl: false,
     timezone: 'Africa/Cairo',
     activePreset: 'Dental',
+    seedVersion: DEMO_SEED_VERSION,
     bookingRules: {
       minNoticeMinutes: 60,
       maxDaysAhead: 90,
@@ -204,8 +205,10 @@ export const getEmptySeeds = (orgId: string = DEFAULT_ORG_ID) => {
 };
 
 // Mock Engine State Provider
-const DB_STORAGE_KEY = "smilecare_db_store";
-const LEGACY_DB_STORAGE_KEY = "reserveflow_db_store";
+const DEMO_SEED_VERSION = 2;
+const DB_STORAGE_KEY = "smilecare_db_store_v2";
+const LEGACY_DB_STORAGE_KEY = "smilecare_db_store";
+const VERY_LEGACY_DB_STORAGE_KEY = "reserveflow_db_store";
 
 class LocalMockDatabase {
   private key = DB_STORAGE_KEY;
@@ -216,11 +219,9 @@ class LocalMockDatabase {
   }
 
   private migrateLegacyStorage() {
-    const legacy = localStorage.getItem(LEGACY_DB_STORAGE_KEY);
-    if (legacy && !localStorage.getItem(DB_STORAGE_KEY)) {
-      localStorage.setItem(DB_STORAGE_KEY, legacy);
-      localStorage.removeItem(LEGACY_DB_STORAGE_KEY);
-    }
+    // Old US demo catalogs must not be reused — always prefer a fresh Egypt seed.
+    localStorage.removeItem(LEGACY_DB_STORAGE_KEY);
+    localStorage.removeItem(VERY_LEGACY_DB_STORAGE_KEY);
   }
 
   public load() {
@@ -229,8 +230,10 @@ class LocalMockDatabase {
     if (saved) {
       try {
         this.data = JSON.parse(saved);
-        this.ensureDemoBusinessSlug();
-        return;
+        if (this.isUsableDemoCatalog(this.data)) {
+          this.ensureDemoBusinessSlug();
+          return;
+        }
       } catch (e) {
         console.error("Failed to load local DB state", e);
       }
@@ -239,12 +242,36 @@ class LocalMockDatabase {
     this.resetPreset("Dental");
   }
 
+  private isUsableDemoCatalog(data: any): boolean {
+    return Boolean(
+      data?.settings?.seedVersion === DEMO_SEED_VERSION &&
+      data?.settings?.currency === 'EGP' &&
+      data?.settings?.businessName &&
+      Array.isArray(data.services) &&
+      data.services.length > 0 &&
+      Array.isArray(data.employees) &&
+      data.employees.length > 0 &&
+      Array.isArray(data.branches) &&
+      data.branches.length > 0,
+    );
+  }
+
   private ensureDemoBusinessSlug() {
     if (!this.data?.settings) return;
+    let dirty = false;
     if (!this.data.settings.publicSlug) {
       this.data.settings.publicSlug = DEFAULT_PUBLIC_BOOKING_SLUG;
-      this.save();
+      dirty = true;
     }
+    if (!this.data.settings.businessName) {
+      this.data.settings.businessName = 'SmileCare Dental Clinic';
+      dirty = true;
+    }
+    if (!this.data.settings.currency) {
+      this.data.settings.currency = 'EGP';
+      dirty = true;
+    }
+    if (dirty) this.save();
   }
 
   public getPublicBookingSlug(): string {
