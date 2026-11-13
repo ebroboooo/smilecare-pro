@@ -36,14 +36,11 @@ import {
 } from './mockRepository';
 
 const envDemo = import.meta.env.VITE_DEMO_MODE;
-const hostLooksStatic =
-  typeof window !== 'undefined' &&
-  (/\.vercel\.app$/i.test(window.location.hostname) ||
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1');
+const onVercelHost =
+  typeof window !== 'undefined' && /\.vercel\.app$/i.test(window.location.hostname);
 
-/** Vercel SPA and local preview have no Express API — always use the in-browser demo store. */
-export const DEMO_MODE = envDemo === 'true' || envDemo === true || hostLooksStatic;
+/** Demo store when explicitly enabled (Vercel build) or when hosted on Vercel without an API. */
+export const DEMO_MODE = envDemo === 'true' || envDemo === true || onVercelHost;
 
 class RepositoryProvider {
   public branches: IBranchRepository;

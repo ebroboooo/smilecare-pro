@@ -92,7 +92,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentUser]);
 
   useEffect(() => {
-    refreshData();
+    void refreshData();
+    const safety = window.setTimeout(() => setIsLoading(false), 5000);
+    return () => window.clearTimeout(safety);
   }, [currentUser, refreshData]);
 
   // Adjust default branch scope based on current user scope

@@ -127,6 +127,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
+    if (DEMO_MODE) {
+      if (!currentPassword || newPassword.length < 10) {
+        throw new Error('Enter your current password and a new password of at least 10 characters.');
+      }
+      if (!currentUser) throw new Error('Sign in again, then change the password.');
+      const updated = { ...currentUser, mustChangePassword: false };
+      sessionStorage.setItem('smilecare_demo_user', JSON.stringify(updated));
+      setCurrentUser(updated);
+      return;
+    }
     const result = await api<{ user: User }>('/api/auth/change-password', {
       method: 'POST',
       body: JSON.stringify({ currentPassword, newPassword }),

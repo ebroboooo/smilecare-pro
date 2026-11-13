@@ -14,15 +14,30 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   headers.set('X-Requested-With', 'XMLHttpRequest');
   if (init.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(path, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'Could not reach the clinic server. Check your connection or use demo mode.');
+  }
 
   if (response.status === 204) return undefined as T;
 
   const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+  const looksLikeHtml = contentType.includes('text/html') || /^\s*<!doctype html/i.test(text) || /^\s*<html/i.test(text);
+  if (looksLikeHtml) {
+    throw new ApiError(
+      response.status || 502,
+      'NO_API',
+      'This page needs the clinic API. On the Vercel demo, use Staff accounts in browser demo mode instead.',
+    );
+  }
+
   let data: { error?: { code?: string; message?: string } } | null = null;
   if (text) {
     try {
